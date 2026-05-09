@@ -1,0 +1,9 @@
+{
+    "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/schemas/oxlintrc.json",
+    "plugins": ["react", "typescript"],
+    "env": {
+        "browser": true,
+        "node": true
+    },
+    "ignorePatterns": ["node_modules", ".bun-cache", "dist", "fixtures"]
+}

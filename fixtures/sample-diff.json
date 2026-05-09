@@ -1,0 +1,179 @@
+{
+    "repoRoot": "/example/repo",
+    "branch": "main",
+    "head": "abc1234",
+    "generatedAt": "2026-05-08T12:00:00.000Z",
+    "files": [
+        {
+            "path": "README.md",
+            "status": "modified",
+            "additions": 2,
+            "deletions": 1,
+            "rawPatch": "diff --git a/README.md b/README.md\nindex 1234567..89abcde 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,5 +1,6 @@\n # prettydiff\n \n-A tool for viewing diffs.\n+A CLI tool that opens a local web viewer for the working-tree diff of any git repo.\n+It supports unified and side-by-side views.\n \n ## Install\n",
+            "chunks": [
+                {
+                    "oldStart": 1,
+                    "oldLines": 5,
+                    "newStart": 1,
+                    "newLines": 6,
+                    "header": "@@ -1,5 +1,6 @@",
+                    "changes": [
+                        { "type": "normal", "content": " # prettydiff", "ln1": 1, "ln2": 1 },
+                        { "type": "normal", "content": " ", "ln1": 2, "ln2": 2 },
+                        { "type": "del", "content": "-A tool for viewing diffs.", "ln": 3 },
+                        {
+                            "type": "add",
+                            "content": "+A CLI tool that opens a local web viewer for the working-tree diff of any git repo.",
+                            "ln": 3
+                        },
+                        {
+                            "type": "add",
+                            "content": "+It supports unified and side-by-side views.",
+                            "ln": 4
+                        },
+                        { "type": "normal", "content": " ", "ln1": 4, "ln2": 5 },
+                        { "type": "normal", "content": " ## Install", "ln1": 5, "ln2": 6 }
+                    ]
+                }
+            ]
+        },
+        {
+            "path": "src/index.ts",
+            "status": "modified",
+            "additions": 4,
+            "deletions": 2,
+            "rawPatch": "diff --git a/src/index.ts b/src/index.ts\nindex 0000001..0000002 100644\n--- a/src/index.ts\n+++ b/src/index.ts\n@@ -1,7 +1,9 @@\n import { greet } from './greet';\n \n-function main() {\n-  console.log(greet('world'));\n+function main(name: string = 'world') {\n+  const message = greet(name);\n+  console.log(message);\n+  return message;\n }\n \n main();\n",
+            "chunks": [
+                {
+                    "oldStart": 1,
+                    "oldLines": 7,
+                    "newStart": 1,
+                    "newLines": 9,
+                    "header": "@@ -1,7 +1,9 @@",
+                    "changes": [
+                        {
+                            "type": "normal",
+                            "content": " import { greet } from './greet';",
+                            "ln1": 1,
+                            "ln2": 1
+                        },
+                        { "type": "normal", "content": " ", "ln1": 2, "ln2": 2 },
+                        { "type": "del", "content": "-function main() {", "ln": 3 },
+                        { "type": "del", "content": "-  console.log(greet('world'));", "ln": 4 },
+                        {
+                            "type": "add",
+                            "content": "+function main(name: string = 'world') {",
+                            "ln": 3
+                        },
+                        { "type": "add", "content": "+  const message = greet(name);", "ln": 4 },
+                        { "type": "add", "content": "+  console.log(message);", "ln": 5 },
+                        { "type": "add", "content": "+  return message;", "ln": 6 },
+                        { "type": "normal", "content": " }", "ln1": 5, "ln2": 7 },
+                        { "type": "normal", "content": " ", "ln1": 6, "ln2": 8 },
+                        { "type": "normal", "content": " main();", "ln1": 7, "ln2": 9 }
+                    ]
+                }
+            ]
+        },
+        {
+            "path": "src/components/Button.tsx",
+            "status": "added",
+            "additions": 8,
+            "deletions": 0,
+            "rawPatch": "diff --git a/src/components/Button.tsx b/src/components/Button.tsx\nnew file mode 100644\nindex 0000000..1111111\n--- /dev/null\n+++ b/src/components/Button.tsx\n@@ -0,0 +1,8 @@\n+import * as React from 'react';\n+\n+export interface ButtonProps {\n+  label: string;\n+}\n+\n+export function Button({ label }: ButtonProps) {\n+  return <button>{label}</button>;\n+}\n",
+            "chunks": [
+                {
+                    "oldStart": 0,
+                    "oldLines": 0,
+                    "newStart": 1,
+                    "newLines": 8,
+                    "header": "@@ -0,0 +1,8 @@",
+                    "changes": [
+                        { "type": "add", "content": "+import * as React from 'react';", "ln": 1 },
+                        { "type": "add", "content": "+", "ln": 2 },
+                        { "type": "add", "content": "+export interface ButtonProps {", "ln": 3 },
+                        { "type": "add", "content": "+  label: string;", "ln": 4 },
+                        { "type": "add", "content": "+}", "ln": 5 },
+                        { "type": "add", "content": "+", "ln": 6 },
+                        {
+                            "type": "add",
+                            "content": "+export function Button({ label }: ButtonProps) {",
+                            "ln": 7
+                        },
+                        { "type": "add", "content": "+  return <button>{label}</button>;", "ln": 8 }
+                    ]
+                }
+            ]
+        },
+        {
+            "path": "src/legacy/old-helper.ts",
+            "status": "deleted",
+            "additions": 0,
+            "deletions": 3,
+            "rawPatch": "diff --git a/src/legacy/old-helper.ts b/src/legacy/old-helper.ts\ndeleted file mode 100644\nindex 2222222..0000000\n--- a/src/legacy/old-helper.ts\n+++ /dev/null\n@@ -1,3 +0,0 @@\n-export function oldHelper() {\n-  return 'deprecated';\n-}\n",
+            "chunks": [
+                {
+                    "oldStart": 1,
+                    "oldLines": 3,
+                    "newStart": 0,
+                    "newLines": 0,
+                    "header": "@@ -1,3 +0,0 @@",
+                    "changes": [
+                        { "type": "del", "content": "-export function oldHelper() {", "ln": 1 },
+                        { "type": "del", "content": "-  return 'deprecated';", "ln": 2 },
+                        { "type": "del", "content": "-}", "ln": 3 }
+                    ]
+                }
+            ]
+        },
+        {
+            "path": "package.json",
+            "status": "modified",
+            "additions": 1,
+            "deletions": 0,
+            "rawPatch": "diff --git a/package.json b/package.json\nindex 3333333..4444444 100644\n--- a/package.json\n+++ b/package.json\n@@ -10,6 +10,7 @@\n   \"dependencies\": {\n     \"react\": \"^19.0.0\",\n     \"react-dom\": \"^19.0.0\",\n+    \"@pierre/diffs\": \"^1.1.21\",\n     \"hono\": \"^4.0.0\"\n   }\n }\n",
+            "chunks": [
+                {
+                    "oldStart": 10,
+                    "oldLines": 6,
+                    "newStart": 10,
+                    "newLines": 7,
+                    "header": "@@ -10,6 +10,7 @@",
+                    "changes": [
+                        {
+                            "type": "normal",
+                            "content": "   \"dependencies\": {",
+                            "ln1": 10,
+                            "ln2": 10
+                        },
+                        {
+                            "type": "normal",
+                            "content": "     \"react\": \"^19.0.0\",",
+                            "ln1": 11,
+                            "ln2": 11
+                        },
+                        {
+                            "type": "normal",
+                            "content": "     \"react-dom\": \"^19.0.0\",",
+                            "ln1": 12,
+                            "ln2": 12
+                        },
+                        {
+                            "type": "add",
+                            "content": "+    \"@pierre/diffs\": \"^1.1.21\",",
+                            "ln": 13
+                        },
+                        {
+                            "type": "normal",
+                            "content": "     \"hono\": \"^4.0.0\"",
+                            "ln1": 13,
+                            "ln2": 14
+                        },
+                        { "type": "normal", "content": "   }", "ln1": 14, "ln2": 15 },
+                        { "type": "normal", "content": " }", "ln1": 15, "ln2": 16 }
+                    ]
+                }
+            ]
+        }
+    ]
+}
