@@ -1,10 +1,9 @@
 import type { ParsedFile } from "./types";
 
 /**
- * Compare two file paths the way @pierre/trees displays them: walk segments
- * left-to-right; at the first differing segment, paths inside a deeper directory
- * win over paths that terminate at this level (folders before files), and
- * otherwise compare case-insensitively + numerically.
+ * Compare two file paths the way @pierre/trees displays them: walk segments left-to-right; at the
+ * first differing segment, paths inside a deeper directory win over paths that terminate at this
+ * level (folders before files), and otherwise compare case-insensitively + numerically.
  */
 export function compareTreePath(a: string, b: string): number {
     const aParts = a.split("/");

@@ -1,5 +1,6 @@
 import { fileCardId } from "@/lib/slug";
 import { FileTree, useFileTree } from "@pierre/trees/react";
+import { ArrowUpToLine } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import type { ParsedFile } from "@/lib/types";
@@ -22,6 +23,12 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
         [files],
     );
 
+    const counts = useMemo(() => {
+        const c = { added: 0, modified: 0, deleted: 0, renamed: 0, untracked: 0 };
+        for (const f of files) c[f.status] = (c[f.status] ?? 0) + 1;
+        return c;
+    }, [files]);
+
     const onScrollToRef = useRef(onScrollTo);
     useEffect(() => {
         onScrollToRef.current = onScrollTo;
@@ -37,14 +44,12 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
         onSelectionChange: (selected) => {
             const last = selected[selected.length - 1];
             if (!last) return;
-            // Only fire for file paths we know about (skip directory selections)
             if (paths.includes(last)) {
                 onScrollToRef.current(last);
             }
         },
     });
 
-    // Keep tree selection in sync with the file currently in view (driven by IntersectionObserver in App).
     useEffect(() => {
         if (!activePath) return;
         const id = window.requestAnimationFrame(() => {
@@ -57,17 +62,64 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
     }, [activePath]);
 
     return (
-        <aside className="bg-sidebar text-sidebar-foreground flex h-full min-h-0 flex-col overflow-hidden border-r">
-            <div className="text-muted-foreground flex h-10 items-center border-b px-3 text-xs font-semibold tracking-wide uppercase">
-                Files
+        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full min-h-0 flex-col overflow-hidden border-r">
+            <div className="border-sidebar-border flex h-12 shrink-0 items-center justify-between border-b px-3">
+                <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-[10.5px] font-medium tracking-[0.12em] uppercase">
+                        Changes
+                    </span>
+                    <span className="text-foreground/90 font-mono text-[11px] tabular-nums">
+                        {files.length}
+                    </span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono text-[10.5px]">
+                    {counts.added > 0 && (
+                        <span
+                            className="flex items-center gap-1 text-emerald-400/90"
+                            title={`${counts.added} added`}
+                        >
+                            <span aria-hidden className="size-1.5 rounded-full bg-emerald-400/80" />
+                            {counts.added}
+                        </span>
+                    )}
+                    {counts.modified > 0 && (
+                        <span
+                            className="text-primary/90 flex items-center gap-1"
+                            title={`${counts.modified} modified`}
+                        >
+                            <span aria-hidden className="bg-primary/80 size-1.5 rounded-full" />
+                            {counts.modified}
+                        </span>
+                    )}
+                    {counts.deleted > 0 && (
+                        <span
+                            className="flex items-center gap-1 text-rose-400/90"
+                            title={`${counts.deleted} deleted`}
+                        >
+                            <span aria-hidden className="size-1.5 rounded-full bg-rose-400/80" />
+                            {counts.deleted}
+                        </span>
+                    )}
+                    {counts.untracked > 0 && (
+                        <span
+                            className="flex items-center gap-1 text-amber-400/90"
+                            title={`${counts.untracked} untracked`}
+                        >
+                            <span aria-hidden className="size-1.5 rounded-full bg-amber-400/80" />
+                            {counts.untracked}
+                        </span>
+                    )}
+                </div>
             </div>
             <div className="flex-1 overflow-hidden">
                 <FileTree model={model} className="h-full w-full" />
             </div>
-            <div className="text-muted-foreground border-t px-3 py-2 text-xs">
-                {files.length} file{files.length === 1 ? "" : "s"} ·{" "}
+            <div className="border-sidebar-border text-muted-foreground flex h-9 shrink-0 items-center justify-between border-t px-3 text-[11px]">
+                <span className="font-mono">
+                    {files.length} file{files.length === 1 ? "" : "s"}
+                </span>
                 <button
-                    className="underline-offset-2 hover:underline"
+                    className="hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
                     onClick={() => {
                         const first = files[0];
                         if (first) {
@@ -76,6 +128,7 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
                         }
                     }}
                 >
+                    <ArrowUpToLine className="size-3" />
                     jump to top
                 </button>
             </div>
@@ -84,6 +137,5 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
 }
 
 function cssEscape(s: string): string {
-    // CSS.escape isn't available everywhere; this is sufficient for our path strings.
     return s.replace(/["\\]/g, "\\$&");
 }

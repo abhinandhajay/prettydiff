@@ -83,10 +83,7 @@ export default function App() {
         return () => observer.disconnect();
     }, [payload]);
 
-    const sortedFiles = useMemo(
-        () => (payload ? sortFilesForTree(payload.files) : []),
-        [payload],
-    );
+    const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
 
     if (error) {
         return <EmptyState title="Couldn't load diff" message={error} />;
@@ -108,15 +105,15 @@ export default function App() {
                 onCollapseAll={collapseAll}
             />
             <div
-                className="grid min-h-0 flex-1"
-                style={{ gridTemplateColumns: "280px 1fr" }}
+                className="relative grid min-h-0 flex-1"
+                style={{ gridTemplateColumns: "276px 1fr" }}
             >
                 <FileTreeSidebar
                     files={sortedFiles}
                     activePath={activePath}
                     onScrollTo={scrollToFile}
                 />
-                <main ref={cardsRef} className="space-y-3 overflow-y-auto p-4">
+                <main ref={cardsRef} className="space-y-3 overflow-y-auto px-5 py-5">
                     {sortedFiles.map((f) => (
                         <FileCard
                             key={f.path}

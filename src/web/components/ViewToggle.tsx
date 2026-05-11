@@ -8,6 +8,13 @@ interface Props {
     onChange: (v: ViewMode) => void;
 }
 
+const itemClass =
+    "h-8 rounded-none border-0 px-2.5 text-[11.5px] font-medium tracking-tight " +
+    "text-muted-foreground hover:text-foreground hover:bg-muted/40 " +
+    "data-[state=on]:bg-secondary/80 data-[state=on]:text-foreground " +
+    "data-[state=on]:shadow-[inset_0_-1.5px_0_var(--primary)] " +
+    "transition-colors first:rounded-l-md last:rounded-r-md";
+
 export function ViewToggle({ value, onChange }: Props) {
     return (
         <ToggleGroup
@@ -16,14 +23,15 @@ export function ViewToggle({ value, onChange }: Props) {
             onValueChange={(v) => v && onChange(v as ViewMode)}
             variant="outline"
             size="sm"
+            className="border-border bg-muted/20 gap-0 overflow-hidden rounded-md border"
         >
-            <ToggleGroupItem value="unified" aria-label="Unified view">
-                <Rows />
-                <span className="ml-1.5 text-xs">Unified</span>
+            <ToggleGroupItem value="unified" aria-label="Unified view" className={itemClass}>
+                <Rows className="size-3.5" />
+                <span className="ml-1 hidden sm:inline">Unified</span>
             </ToggleGroupItem>
-            <ToggleGroupItem value="split" aria-label="Side-by-side view">
-                <Columns />
-                <span className="ml-1.5 text-xs">Split</span>
+            <ToggleGroupItem value="split" aria-label="Side-by-side view" className={itemClass}>
+                <Columns className="size-3.5" />
+                <span className="ml-1 hidden sm:inline">Split</span>
             </ToggleGroupItem>
         </ToggleGroup>
     );
