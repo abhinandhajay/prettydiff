@@ -12,21 +12,16 @@ interface Props {
 }
 
 export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
-    const paths = useMemo(() => files.map((f) => f.path), [files]);
-
-    const gitStatus = useMemo(
-        () =>
-            files.map((f) => ({
-                path: f.path,
-                status: f.status,
-            })),
-        [files],
-    );
-
-    const counts = useMemo(() => {
-        const c = { added: 0, modified: 0, deleted: 0, renamed: 0, untracked: 0 };
-        for (const f of files) c[f.status] = (c[f.status] ?? 0) + 1;
-        return c;
+    const { paths, gitStatus, counts } = useMemo(() => {
+        const paths: string[] = [];
+        const gitStatus: { path: string; status: ParsedFile["status"] }[] = [];
+        const counts = { added: 0, modified: 0, deleted: 0, renamed: 0, untracked: 0 };
+        for (const f of files) {
+            paths.push(f.path);
+            gitStatus.push({ path: f.path, status: f.status });
+            counts[f.status] = (counts[f.status] ?? 0) + 1;
+        }
+        return { paths, gitStatus, counts };
     }, [files]);
 
     const onScrollToRef = useRef(onScrollTo);
@@ -54,7 +49,7 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
         if (!activePath) return;
         const id = window.requestAnimationFrame(() => {
             const el = document.querySelector<HTMLElement>(
-                `[data-prettydiff-tree-row="${cssEscape(activePath)}"]`,
+                `[data-prettydiff-tree-row="${CSS.escape(activePath)}"]`,
             );
             el?.scrollIntoView({ block: "nearest" });
         });
@@ -134,8 +129,4 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
             </div>
         </aside>
     );
-}
-
-function cssEscape(s: string): string {
-    return s.replace(/["\\]/g, "\\$&");
 }

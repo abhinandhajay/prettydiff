@@ -23,16 +23,7 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     viewMode: ViewMode;
-    onActivated?: (path: string) => void;
 }
-
-const STATUS_LABEL: Record<FileStatus, string> = {
-    added: "added",
-    modified: "modified",
-    deleted: "deleted",
-    renamed: "renamed",
-    untracked: "untracked",
-};
 
 const STATUS_VARIANT: Record<
     FileStatus,
@@ -68,7 +59,7 @@ function splitPath(path: string): { dir: string; base: string } {
     return { dir: path.slice(0, idx + 1), base: path.slice(idx + 1) };
 }
 
-export function FileCard({ file, open, onOpenChange, viewMode, onActivated: _onActivated }: Props) {
+export function FileCard({ file, open, onOpenChange, viewMode }: Props) {
     const { dir, base } = splitPath(file.path);
 
     return (
@@ -115,7 +106,7 @@ export function FileCard({ file, open, onOpenChange, viewMode, onActivated: _onA
                     </CollapsibleTrigger>
                     <div className="flex shrink-0 items-center gap-2.5">
                         <Badge variant={STATUS_VARIANT[file.status]} dot>
-                            {STATUS_LABEL[file.status]}
+                            {file.status}
                         </Badge>
                         <span className="font-mono text-[11px] text-emerald-400 tabular-nums">
                             +{file.additions}

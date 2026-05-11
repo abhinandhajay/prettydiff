@@ -1,7 +1,7 @@
 import mri from "mri";
 import open from "open";
 
-import { getDiffPayload, getRepoRoot } from "./git.js";
+import { getDiffPayload } from "./git.js";
 import { findPort } from "./port.js";
 import { startServer } from "./server.js";
 
@@ -59,14 +59,7 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
     }
 
-    const cwd = process.cwd();
-    const repoRoot = await getRepoRoot(cwd);
-    if (!repoRoot) {
-        process.stderr.write("prettydiff: not a git repository\n");
-        return 1;
-    }
-
-    const payload = await getDiffPayload(cwd);
+    const payload = await getDiffPayload(process.cwd());
     if (!payload) {
         process.stderr.write("prettydiff: not a git repository\n");
         return 1;

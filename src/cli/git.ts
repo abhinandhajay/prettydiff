@@ -169,13 +169,18 @@ export async function getDiffPayload(cwd: string): Promise<DiffPayload | null> {
         getHead(repoRoot),
     ]);
 
+    const synthesized = await Promise.all(
+        untrackedList.map(async (rel) => ({
+            rel,
+            patch: await synthesizeUntrackedPatch(repoRoot, rel),
+        })),
+    );
     const untrackedPaths = new Set<string>();
     const untrackedPatches: string[] = [];
-    for (const rel of untrackedList) {
-        const synth = await synthesizeUntrackedPatch(repoRoot, rel);
-        if (synth) {
+    for (const { rel, patch } of synthesized) {
+        if (patch) {
             untrackedPaths.add(rel);
-            untrackedPatches.push(synth);
+            untrackedPatches.push(patch);
         }
     }
 

@@ -56,7 +56,6 @@ export default function App() {
         });
     }, []);
 
-    // IntersectionObserver: track which file is currently in view → drives sidebar active highlight.
     const cardsRef = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
         if (!payload || !cardsRef.current) return;
@@ -86,13 +85,13 @@ export default function App() {
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
 
     if (error) {
-        return <EmptyState title="Couldn't load diff" message={error} />;
+        return <EmptyState kind="error" title="Couldn't load diff" message={error} />;
     }
     if (!payload) {
-        return <EmptyState title="Loading…" />;
+        return <EmptyState kind="loading" title="Loading…" />;
     }
     if (payload.files.length === 0) {
-        return <EmptyState title="No changes" message="Working tree matches HEAD." />;
+        return <EmptyState kind="empty" title="No changes" message="Working tree matches HEAD." />;
     }
 
     return (

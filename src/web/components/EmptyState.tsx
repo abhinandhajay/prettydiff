@@ -1,20 +1,12 @@
 import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 
 interface Props {
+    kind: "loading" | "error" | "empty";
     title: string;
     message?: string;
 }
 
-function detectKind(title: string): "loading" | "error" | "empty" {
-    const lc = title.toLowerCase();
-    if (lc.includes("load")) return "loading";
-    if (lc.includes("couldn") || lc.includes("error") || lc.includes("fail")) return "error";
-    return "empty";
-}
-
-export function EmptyState({ title, message }: Props) {
-    const kind = detectKind(title);
-
+export function EmptyState({ kind, title, message }: Props) {
     return (
         <div className="bg-background relative flex h-screen flex-col items-center justify-center gap-4 overflow-hidden px-6 text-center">
             <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(oklch(1_0_0/0.05)_1px,transparent_1px)] bg-size-[18px_18px] opacity-60" />

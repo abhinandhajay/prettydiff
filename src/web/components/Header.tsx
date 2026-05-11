@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
 import { GitBranch, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { useMemo } from "react";
 
 import type { DiffPayload } from "@/lib/types";
 
@@ -63,13 +64,17 @@ function Divider() {
 }
 
 export function Header({ payload, viewMode, onViewModeChange, onExpandAll, onCollapseAll }: Props) {
-    const totals = payload.files.reduce(
-        (acc, f) => {
-            acc.add += f.additions;
-            acc.del += f.deletions;
-            return acc;
-        },
-        { add: 0, del: 0 },
+    const totals = useMemo(
+        () =>
+            payload.files.reduce(
+                (acc, f) => {
+                    acc.add += f.additions;
+                    acc.del += f.deletions;
+                    return acc;
+                },
+                { add: 0, del: 0 },
+            ),
+        [payload.files],
     );
 
     return (
