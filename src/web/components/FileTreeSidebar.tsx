@@ -45,16 +45,62 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
         },
     });
 
+    const activeStyleRef = useRef<HTMLStyleElement | null>(null);
     useEffect(() => {
-        if (!activePath) return;
-        const id = window.requestAnimationFrame(() => {
-            const el = document.querySelector<HTMLElement>(
-                `[data-prettydiff-tree-row="${CSS.escape(activePath)}"]`,
-            );
-            el?.scrollIntoView({ block: "nearest" });
-        });
-        return () => window.cancelAnimationFrame(id);
-    }, [activePath]);
+        let cancelled = false;
+        let raf = 0;
+        const apply = () => {
+            if (cancelled) return;
+            const host = model.getFileTreeContainer();
+            const shadow = host?.shadowRoot;
+            if (!shadow) {
+                raf = window.requestAnimationFrame(apply);
+                return;
+            }
+            let style = activeStyleRef.current;
+            if (!style || style.parentNode !== shadow) {
+                style = document.createElement("style");
+                style.setAttribute("data-prettydiff-active-row", "");
+                shadow.appendChild(style);
+                activeStyleRef.current = style;
+            }
+            const escaped = activePath ? CSS.escape(activePath) : "";
+            style.textContent = `
+                [data-item-selected="true"] {
+                    color: inherit;
+                    background-color: transparent;
+                    --truncate-marker-background-overlay-color: transparent;
+                }
+                [data-item-selected="true"]::before {
+                    outline-color: transparent;
+                }
+                ${
+                    activePath
+                        ? `[data-item-path="${escaped}"] {
+                              color: var(--trees-selected-fg);
+                              background-color: var(--trees-selected-bg);
+                              --truncate-marker-background-overlay-color: var(--trees-selected-bg);
+                          }
+                          [data-item-path="${escaped}"] [data-item-section="icon"] {
+                              color: var(--trees-selected-fg);
+                          }`
+                        : ""
+                }
+            `;
+        };
+        apply();
+        return () => {
+            cancelled = true;
+            if (raf) window.cancelAnimationFrame(raf);
+        };
+    }, [model, activePath]);
+    useEffect(
+        () => () => {
+            activeStyleRef.current?.remove();
+            activeStyleRef.current = null;
+        },
+        [],
+    );
 
     return (
         <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full min-h-0 flex-col overflow-hidden border-r">

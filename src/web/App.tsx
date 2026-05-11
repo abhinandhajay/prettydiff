@@ -60,26 +60,36 @@ export default function App() {
     useEffect(() => {
         if (!payload || !cardsRef.current) return;
         const root = cardsRef.current;
-        const observer = new IntersectionObserver(
-            (entries) => {
-                const visible = entries
-                    .filter((e) => e.isIntersecting)
-                    .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-                const top = visible[0];
-                if (top) {
-                    const path = (top.target as HTMLElement).dataset.filePath;
-                    if (path) setActivePath(path);
+        const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-file-path]"));
+        if (cards.length === 0) return;
+        let raf = 0;
+        const compute = () => {
+            raf = 0;
+            const rootTop = root.getBoundingClientRect().top;
+            let active: string | null = cards[0]?.dataset.filePath ?? null;
+            for (const card of cards) {
+                if (card.getBoundingClientRect().top - rootTop <= 1) {
+                    active = card.dataset.filePath ?? active;
+                } else {
+                    break;
                 }
-            },
-            {
-                root,
-                rootMargin: "-10% 0px -60% 0px",
-                threshold: [0, 0.25, 0.5, 0.75, 1],
-            },
-        );
-        const cards = root.querySelectorAll<HTMLElement>("[data-file-path]");
-        cards.forEach((c) => observer.observe(c));
-        return () => observer.disconnect();
+            }
+            if (active) setActivePath(active);
+        };
+        const schedule = () => {
+            if (raf) return;
+            raf = window.requestAnimationFrame(compute);
+        };
+        schedule();
+        root.addEventListener("scroll", schedule, { passive: true });
+        const ro = new ResizeObserver(schedule);
+        ro.observe(root);
+        cards.forEach((c) => ro.observe(c));
+        return () => {
+            root.removeEventListener("scroll", schedule);
+            ro.disconnect();
+            if (raf) window.cancelAnimationFrame(raf);
+        };
     }, [payload]);
 
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
