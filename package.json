@@ -1,5 +1,5 @@
 {
-    "name": "prettydiff",
+    "name": "@abhinandhajay/prettydiff",
     "version": "0.1.0",
     "description": "Open the working-tree diff of any git repo in a local web viewer.",
     "keywords": [
@@ -8,7 +8,16 @@
         "git",
         "viewer"
     ],
+    "homepage": "https://github.com/abhinandhajay/prettydiff#readme",
+    "bugs": {
+        "url": "https://github.com/abhinandhajay/prettydiff/issues"
+    },
     "license": "MIT",
+    "author": "Abhinandh Ajay",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/abhinandhajay/prettydiff.git"
+    },
     "bin": {
         "prettydiff": "dist/cli/bin.js"
     },
@@ -17,6 +26,9 @@
         "dist/web"
     ],
     "type": "module",
+    "publishConfig": {
+        "access": "public"
+    },
     "scripts": {
         "dev": "vite",
         "build:web": "vite build",
