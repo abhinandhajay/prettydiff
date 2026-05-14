@@ -13,12 +13,10 @@ A refined local web viewer for your Git working tree changes. Run `prettydiff` i
 
 ## Installation
 
-Once published:
-
 ```sh
-npm install -g prettydiff
+npm install -g @abhinandhajay/prettydiff
 # or
-bun add -g prettydiff
+bun add -g @abhinandhajay/prettydiff
 ```
 
 Local install from a clone:
