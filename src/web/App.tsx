@@ -14,21 +14,49 @@ import type { DiffPayload } from "@/lib/types";
 export default function App() {
     const [payload, setPayload] = useState<DiffPayload | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isReloading, setIsReloading] = useState(false);
     const [viewMode, setViewMode] = usePersistedState<ViewMode>("prettydiff:view", "unified");
     const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
     const [activePath, setActivePath] = useState<string | null>(null);
 
-    useEffect(() => {
+    const loadDiff = useCallback((mode: "initial" | "reload") => {
+        if (mode === "reload") setIsReloading(true);
         fetchDiff()
             .then((p) => {
                 setPayload(p);
-                const init: Record<string, boolean> = {};
-                for (const f of p.files) init[f.path] = true;
-                setOpenMap(init);
-                if (p.files[0]) setActivePath(p.files[0].path);
+                if (mode === "initial") {
+                    const init: Record<string, boolean> = {};
+                    for (const f of p.files) init[f.path] = true;
+                    setOpenMap(init);
+                    if (p.files[0]) setActivePath(p.files[0].path);
+                } else {
+                    const present = new Set(p.files.map((f) => f.path));
+                    setOpenMap((prev) => {
+                        const next: Record<string, boolean> = {};
+                        for (const f of p.files) {
+                            next[f.path] = prev[f.path] ?? true;
+                        }
+                        return next;
+                    });
+                    setActivePath((prev) =>
+                        prev && present.has(prev) ? prev : (p.files[0]?.path ?? null),
+                    );
+                }
             })
-            .catch((e) => setError(e?.message ?? String(e)));
+            .catch((e) => {
+                if (mode === "initial") setError(e?.message ?? String(e));
+                else console.warn("prettydiff: reload failed", e);
+            })
+            .finally(() => {
+                if (mode === "reload") setIsReloading(false);
+            });
     }, []);
+
+    useEffect(() => {
+        loadDiff("initial");
+    }, [loadDiff]);
+
+    const reload = useCallback(() => loadDiff("reload"), [loadDiff]);
 
     const setOpen = useCallback((path: string, open: boolean) => {
         setOpenMap((m) => ({ ...m, [path]: open }));
@@ -100,9 +128,6 @@ export default function App() {
     if (!payload) {
         return <EmptyState kind="loading" title="Loading…" />;
     }
-    if (payload.files.length === 0) {
-        return <EmptyState kind="empty" title="No changes" message="Working tree matches HEAD." />;
-    }
 
     return (
         <div className="bg-background flex h-screen flex-col overflow-hidden">
@@ -112,28 +137,34 @@ export default function App() {
                 onViewModeChange={setViewMode}
                 onExpandAll={expandAll}
                 onCollapseAll={collapseAll}
+                onReload={reload}
+                isReloading={isReloading}
             />
-            <div
-                className="relative grid min-h-0 flex-1"
-                style={{ gridTemplateColumns: "276px 1fr" }}
-            >
-                <FileTreeSidebar
-                    files={sortedFiles}
-                    activePath={activePath}
-                    onScrollTo={scrollToFile}
-                />
-                <main ref={cardsRef} className="space-y-3 overflow-y-auto px-5 py-5">
-                    {sortedFiles.map((f) => (
-                        <FileCard
-                            key={f.path}
-                            file={f}
-                            open={openMap[f.path] ?? true}
-                            onOpenChange={(o) => setOpen(f.path, o)}
-                            viewMode={viewMode}
-                        />
-                    ))}
-                </main>
-            </div>
+            {payload.files.length === 0 ? (
+                <EmptyState kind="empty" title="No changes" message="Working tree matches HEAD." />
+            ) : (
+                <div
+                    className="relative grid min-h-0 flex-1"
+                    style={{ gridTemplateColumns: "276px 1fr" }}
+                >
+                    <FileTreeSidebar
+                        files={sortedFiles}
+                        activePath={activePath}
+                        onScrollTo={scrollToFile}
+                    />
+                    <main ref={cardsRef} className="space-y-3 overflow-y-auto px-5 py-5">
+                        {sortedFiles.map((f) => (
+                            <FileCard
+                                key={f.path}
+                                file={f}
+                                open={openMap[f.path] ?? true}
+                                onOpenChange={(o) => setOpen(f.path, o)}
+                                viewMode={viewMode}
+                            />
+                        ))}
+                    </main>
+                </div>
+            )}
         </div>
     );
 }

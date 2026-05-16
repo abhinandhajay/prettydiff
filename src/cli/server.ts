@@ -6,7 +6,7 @@ import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 
-import type { DiffPayload } from "./types.js";
+import { getDiffPayload } from "./git.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // dist/cli/server.js → ../web → dist/web
@@ -17,10 +17,14 @@ export interface StartedServer {
     close: () => Promise<void>;
 }
 
-export async function startServer(payload: DiffPayload, port: number): Promise<StartedServer> {
+export async function startServer(repoRoot: string, port: number): Promise<StartedServer> {
     const app = new Hono();
 
-    app.get("/api/diff", (c) => c.json(payload));
+    app.get("/api/diff", async (c) => {
+        const payload = await getDiffPayload(repoRoot);
+        if (!payload) return c.json({ error: "not a git repository" }, 500);
+        return c.json(payload);
+    });
 
     app.use(
         "/assets/*",

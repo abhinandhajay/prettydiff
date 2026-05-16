@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
-import { GitBranch, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { GitBranch, ChevronsDownUp, ChevronsUpDown, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 
 import type { DiffPayload } from "@/lib/types";
@@ -11,6 +11,8 @@ interface Props {
     onViewModeChange: (v: ViewMode) => void;
     onExpandAll: () => void;
     onCollapseAll: () => void;
+    onReload: () => void;
+    isReloading: boolean;
 }
 
 function repoBasename(repoRoot: string): string {
@@ -63,7 +65,15 @@ function Divider() {
     return <span aria-hidden className="bg-border/70 h-4 w-px shrink-0" />;
 }
 
-export function Header({ payload, viewMode, onViewModeChange, onExpandAll, onCollapseAll }: Props) {
+export function Header({
+    payload,
+    viewMode,
+    onViewModeChange,
+    onExpandAll,
+    onCollapseAll,
+    onReload,
+    isReloading,
+}: Props) {
     const totals = useMemo(
         () =>
             payload.files.reduce(
@@ -130,6 +140,16 @@ export function Header({ payload, viewMode, onViewModeChange, onExpandAll, onCol
                 </div>
                 <Divider />
                 <div className="flex items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onReload}
+                        disabled={isReloading}
+                        title="Reload diff"
+                        className="text-muted-foreground hover:text-foreground"
+                    >
+                        <RefreshCw className={isReloading ? "animate-spin" : undefined} />
+                    </Button>
                     <Button
                         variant="ghost"
                         size="sm"
