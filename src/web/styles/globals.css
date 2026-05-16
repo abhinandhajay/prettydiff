@@ -20,20 +20,20 @@
     --popover-foreground: oklch(0.18 0.012 270);
 
     /* Pierre @pierre/trees modified-file blue (light) */
-    --primary: #1ca1c7;
+    --primary: oklch(0.56 0.085 210);
     --primary-foreground: oklch(0.99 0.005 90);
     --secondary: oklch(0.95 0.005 90);
     --secondary-foreground: oklch(0.22 0.012 270);
     --muted: oklch(0.95 0.005 90);
     --muted-foreground: oklch(0.5 0.012 270);
-    --accent: #1ca1c7;
+    --accent: oklch(0.56 0.085 210);
     --accent-foreground: oklch(0.99 0.005 90);
     --destructive: oklch(0.62 0.21 22);
     --destructive-foreground: oklch(0.985 0 0);
 
     --border: oklch(0.9 0.005 90);
     --input: oklch(0.9 0.005 90);
-    --ring: #1ca1c7;
+    --ring: oklch(0.56 0.085 210);
 
     --success: oklch(0.65 0.15 145);
     --warning: oklch(0.78 0.13 75);
@@ -42,12 +42,12 @@
 
     --sidebar: oklch(0.97 0.003 90);
     --sidebar-foreground: oklch(0.22 0.012 270);
-    --sidebar-primary: #1ca1c7;
+    --sidebar-primary: oklch(0.56 0.085 210);
     --sidebar-primary-foreground: oklch(0.99 0.005 90);
     --sidebar-accent: oklch(0.94 0.005 90);
     --sidebar-accent-foreground: oklch(0.22 0.012 270);
     --sidebar-border: oklch(0.9 0.005 90);
-    --sidebar-ring: #1ca1c7;
+    --sidebar-ring: oklch(0.56 0.085 210);
 }
 
 .dark {
@@ -61,7 +61,7 @@
     --popover-foreground: oklch(0.96 0.005 90);
 
     /* Pierre @pierre/trees modified-file blue (dark) */
-    --primary: #08c0ef;
+    --primary: oklch(0.61 0.12 210);
     --primary-foreground: oklch(0.155 0.008 260);
 
     --secondary: oklch(0.235 0.01 260);
@@ -69,7 +69,7 @@
     --muted: oklch(0.225 0.009 260);
     --muted-foreground: oklch(0.66 0.012 250);
 
-    --accent: #08c0ef;
+    --accent: oklch(0.61 0.12 210);
     --accent-foreground: oklch(0.155 0.008 260);
 
     --destructive: oklch(0.7 0.2 22);
@@ -78,7 +78,7 @@
     /* Hairline borders */
     --border: oklch(1 0 0 / 8%);
     --input: oklch(1 0 0 / 12%);
-    --ring: oklch(0.78 0.14 220 / 60%);
+    --ring: oklch(0.78 0.09 220 / 60%);
 
     --success: oklch(0.74 0.16 148);
     --warning: oklch(0.82 0.135 78);
@@ -87,12 +87,12 @@
 
     --sidebar: oklch(0.135 0.008 260);
     --sidebar-foreground: oklch(0.92 0.005 90);
-    --sidebar-primary: #08c0ef;
+    --sidebar-primary: oklch(0.61 0.12 210);
     --sidebar-primary-foreground: oklch(0.155 0.008 260);
     --sidebar-accent: oklch(0.21 0.009 260);
     --sidebar-accent-foreground: oklch(0.96 0.005 90);
     --sidebar-border: oklch(1 0 0 / 6%);
-    --sidebar-ring: oklch(0.78 0.14 220 / 60%);
+    --sidebar-ring: oklch(0.78 0.09 220 / 60%);
 
     /* @pierre/diffs: lift the diff surfaces from pure #000 to --background so inline
        comments (on --card) sit one tier above the diff stream. */
@@ -181,8 +181,8 @@ body::before {
     pointer-events: none;
     z-index: 0;
     background:
-        radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.78 0.14 220 / 0.07), transparent 60%),
-        radial-gradient(ellipse 80% 50% at 0% 100%, oklch(0.55 0.1 250 / 0.08), transparent 60%);
+        radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.78 0.09 220 / 0.07), transparent 60%),
+        radial-gradient(ellipse 80% 50% at 0% 100%, oklch(0.55 0.065 250 / 0.08), transparent 60%);
 }
 
 /* Thin scrollbar, themed */
