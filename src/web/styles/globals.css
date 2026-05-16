@@ -93,6 +93,13 @@
     --sidebar-accent-foreground: oklch(0.96 0.005 90);
     --sidebar-border: oklch(1 0 0 / 6%);
     --sidebar-ring: oklch(0.78 0.14 220 / 60%);
+
+    /* @pierre/diffs: lift the diff surfaces from pure #000 to --background so inline
+       comments (on --card) sit one tier above the diff stream. */
+    --diffs-bg-buffer-override: var(--background);
+    --diffs-bg-context-override: var(--background);
+    --diffs-bg-context-gutter-override: var(--background);
+    --diffs-bg-separator-override: var(--background);
 }
 
 @theme inline {

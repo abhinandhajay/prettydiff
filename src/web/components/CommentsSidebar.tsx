@@ -298,93 +298,102 @@ function CommentRow({
         <div
             ref={register}
             className={cn(
-                "relative rounded-md border p-2 transition-[box-shadow,background-color,border-color]",
-                "border-border/50 bg-card/50",
+                "relative overflow-hidden rounded-lg border transition-[box-shadow,background-color,border-color]",
+                "border-border/50 bg-card",
                 checked && !comment.stale && "border-primary/40 bg-primary/4",
                 comment.stale && "opacity-60",
                 flash && "ring-primary/60 ring-2 ring-offset-1 ring-offset-transparent",
             )}
         >
-            <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 text-[11px]">
-                        <span className="text-muted-foreground font-mono tabular-nums">
-                            L{comment.lineNumber}
-                        </span>
-                        <span
-                            className={cn(
-                                "font-mono",
-                                comment.lineType === "change-addition" && "text-emerald-400",
-                                comment.lineType === "change-deletion" && "text-rose-400",
-                                (comment.lineType === "context" ||
-                                    comment.lineType === "context-expanded") &&
-                                    "text-muted-foreground",
-                            )}
+            <div
+                className={cn(
+                    "from-primary/8 to-primary/2 border-border/50 flex items-center justify-between gap-1.5 border-b bg-linear-to-b px-2.5 py-1",
+                    checked && !comment.stale && "from-primary/12 to-primary/3 border-primary/25",
+                )}
+            >
+                <div className="flex min-w-0 items-center gap-1.5 text-[11px]">
+                    <span className="text-muted-foreground font-mono tabular-nums">
+                        L{comment.lineNumber}
+                    </span>
+                    <span
+                        className={cn(
+                            "font-mono",
+                            comment.lineType === "change-addition" && "text-emerald-400",
+                            comment.lineType === "change-deletion" && "text-rose-400",
+                            (comment.lineType === "context" ||
+                                comment.lineType === "context-expanded") &&
+                                "text-muted-foreground",
+                        )}
+                    >
+                        {sideMark}
+                    </span>
+                    {comment.stale ? (
+                        <Badge
+                            variant="outline"
+                            className="text-muted-foreground/80 border-border/60 px-1 py-0 text-[9.5px] leading-[1.4] font-normal tracking-wide uppercase"
                         >
-                            {sideMark}
-                        </span>
-                        {comment.stale ? (
-                            <Badge variant="outline" className="text-[9.5px]">
-                                outdated
-                            </Badge>
-                        ) : null}
-                        <div className="ml-auto flex items-center gap-0.5">
-                            {!editing && !comment.stale ? (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-muted-foreground/70 hover:text-foreground size-6"
-                                    onClick={() => setEditing(true)}
-                                    title="Edit comment"
-                                >
-                                    <Pencil className="size-3" />
-                                </Button>
-                            ) : null}
+                            outdated
+                        </Badge>
+                    ) : null}
+                </div>
+                <Checkbox
+                    checked={checked}
+                    onCheckedChange={onToggle}
+                    disabled={comment.stale}
+                    aria-label="Select comment"
+                />
+            </div>
+            <div className="px-2.5 pt-2 pb-2">
+                <pre className="text-muted-foreground/80 truncate font-mono text-[11px]">
+                    {comment.lineText || " "}
+                </pre>
+                {editing ? (
+                    <div className="mt-1.5">
+                        <InlineCommentEditor
+                            initialValue={comment.body}
+                            onSave={(body) => {
+                                onEdit(body);
+                                setEditing(false);
+                            }}
+                            onCancel={() => setEditing(false)}
+                            rows={3}
+                        />
+                    </div>
+                ) : (
+                    <p className="text-foreground/85 mt-1.5 text-[12.5px] leading-relaxed whitespace-pre-wrap">
+                        {comment.body}
+                    </p>
+                )}
+            </div>
+            {!editing ? (
+                <div className="from-primary/3 to-primary/0 border-border/50 flex items-center justify-between gap-2 border-t bg-linear-to-b px-2.5 py-1">
+                    <span className="text-muted-foreground/70 font-mono text-[10.5px] tabular-nums">
+                        {formatRelativeTime(comment.createdAt)}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                        {!comment.stale ? (
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-muted-foreground/70 size-6 hover:text-rose-400"
-                                onClick={onDelete}
-                                title="Delete comment"
+                                className="text-muted-foreground/70 hover:text-foreground size-6"
+                                onClick={() => setEditing(true)}
+                                title="Edit comment"
                             >
-                                <Trash2 className="size-3" />
+                                <Pencil className="size-3" />
                             </Button>
-                            <Checkbox
-                                checked={checked}
-                                onCheckedChange={onToggle}
-                                disabled={comment.stale}
-                                className="ml-1"
-                                aria-label="Select comment"
-                            />
-                        </div>
+                        ) : null}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground/70 hover:bg-destructive hover:text-destructive-foreground size-6"
+                            onClick={onDelete}
+                            title="Delete comment"
+                        >
+                            <Trash2 className="size-3" />
+                        </Button>
                     </div>
-                    <pre className="text-muted-foreground/80 mt-1 truncate font-mono text-[11px]">
-                        {comment.lineText || " "}
-                    </pre>
-                    {editing ? (
-                        <div className="mt-1.5">
-                            <InlineCommentEditor
-                                initialValue={comment.body}
-                                onSave={(body) => {
-                                    onEdit(body);
-                                    setEditing(false);
-                                }}
-                                onCancel={() => setEditing(false)}
-                                rows={3}
-                            />
-                        </div>
-                    ) : (
-                        <>
-                            <p className="text-foreground/85 mt-1 text-[12.5px] whitespace-pre-wrap">
-                                {comment.body}
-                            </p>
-                            <p className="text-muted-foreground/70 mt-1 font-mono text-[10.5px]">
-                                {formatRelativeTime(comment.createdAt)}
-                            </p>
-                        </>
-                    )}
                 </div>
-            </div>
+            ) : null}
         </div>
     );
 }
