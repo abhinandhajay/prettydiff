@@ -1,7 +1,15 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
 import { cn } from "@/lib/utils";
-import { GitBranch, ChevronsDownUp, ChevronsUpDown, RefreshCw, WrapText } from "lucide-react";
+import {
+    ChevronsDownUp,
+    ChevronsUpDown,
+    GitBranch,
+    MessageSquare,
+    RefreshCw,
+    WrapText,
+} from "lucide-react";
 import { useMemo } from "react";
 
 import type { DiffPayload } from "@/lib/types";
@@ -16,6 +24,9 @@ interface Props {
     onCollapseAll: () => void;
     onReload: () => void;
     isReloading: boolean;
+    showComments: boolean;
+    onShowCommentsChange: (v: boolean) => void;
+    commentCount: number;
 }
 
 function repoBasename(repoRoot: string): string {
@@ -78,6 +89,9 @@ export function Header({
     onCollapseAll,
     onReload,
     isReloading,
+    showComments,
+    onShowCommentsChange,
+    commentCount,
 }: Props) {
     const totals = useMemo(
         () =>
@@ -185,6 +199,27 @@ export function Header({
                         className="text-muted-foreground hover:text-foreground"
                     >
                         <ChevronsDownUp />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onShowCommentsChange(!showComments)}
+                        aria-pressed={showComments}
+                        title={showComments ? "Hide comments sidebar" : "Show comments sidebar"}
+                        className={cn(
+                            "relative text-muted-foreground hover:text-foreground",
+                            showComments && "text-foreground bg-muted/60",
+                        )}
+                    >
+                        <MessageSquare />
+                        {commentCount > 0 ? (
+                            <Badge
+                                variant="secondary"
+                                className="pointer-events-none absolute -top-1 -right-1 h-4 min-w-4 rounded-full px-1 font-mono text-[9px] tabular-nums"
+                            >
+                                {commentCount}
+                            </Badge>
+                        ) : null}
                     </Button>
                 </div>
                 <ViewToggle value={viewMode} onChange={onViewModeChange} />

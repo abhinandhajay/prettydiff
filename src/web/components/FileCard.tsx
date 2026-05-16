@@ -1,6 +1,9 @@
+import { CommentComposer } from "@/components/CommentComposer";
+import { CommentIndicator } from "@/components/CommentIndicator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { commentKey, commentsByKey, lookupLineText } from "@/lib/comments";
 import { fileCardId } from "@/lib/slug";
 import { cn } from "@/lib/utils";
 import { PatchDiff } from "@pierre/diffs/react";
@@ -13,10 +16,24 @@ import {
     FilePen,
     FileBox,
     ArrowRight,
+    Plus,
 } from "lucide-react";
+import { useCallback, useMemo } from "react";
 
 import type { ViewMode } from "@/components/ViewToggle";
-import type { ParsedFile, FileStatus } from "@/lib/types";
+import type {
+    CommentLineType,
+    CommentSide,
+    DiffComment,
+    DraftLine,
+    FileStatus,
+    ParsedFile,
+} from "@/lib/types";
+import type { DiffLineAnnotation } from "@pierre/diffs";
+
+type AnnotationMeta =
+    | { kind: "draft" }
+    | { kind: "existing"; commentIds: string[]; preview: string; staleCount: number };
 
 interface Props {
     file: ParsedFile;
@@ -24,6 +41,12 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     viewMode: ViewMode;
     wrap: boolean;
+    comments: DiffComment[];
+    activeDraft: DraftLine | null;
+    onRequestDraft: (draft: DraftLine) => void;
+    onCancelDraft: () => void;
+    onSaveDraft: (body: string) => void;
+    onFocusComment: (id: string) => void;
 }
 
 const STATUS_VARIANT: Record<
@@ -60,8 +83,96 @@ function splitPath(path: string): { dir: string; base: string } {
     return { dir: path.slice(0, idx + 1), base: path.slice(idx + 1) };
 }
 
-export function FileCard({ file, open, onOpenChange, viewMode, wrap }: Props) {
+function deriveLineType(
+    file: ParsedFile,
+    side: CommentSide,
+    lineNumber: number,
+): { lineType: CommentLineType; lineText: string } | null {
+    const additionText = lookupLineText(file, "additions", lineNumber);
+    const deletionText = lookupLineText(file, "deletions", lineNumber);
+    if (side === "additions") {
+        if (additionText === undefined) return null;
+        if (deletionText !== undefined && deletionText === additionText) {
+            return { lineType: "context", lineText: additionText };
+        }
+        return { lineType: "change-addition", lineText: additionText };
+    }
+    if (deletionText === undefined) return null;
+    if (additionText !== undefined && additionText === deletionText) {
+        return { lineType: "context", lineText: deletionText };
+    }
+    return { lineType: "change-deletion", lineText: deletionText };
+}
+
+export function FileCard({
+    file,
+    open,
+    onOpenChange,
+    viewMode,
+    wrap,
+    comments,
+    activeDraft,
+    onRequestDraft,
+    onCancelDraft,
+    onSaveDraft,
+    onFocusComment,
+}: Props) {
     const { dir, base } = splitPath(file.path);
+
+    const lineAnnotations = useMemo<DiffLineAnnotation<AnnotationMeta>[]>(() => {
+        const grouped = commentsByKey(comments.filter((c) => !c.stale));
+        const annotations: DiffLineAnnotation<AnnotationMeta>[] = [];
+
+        for (const [, group] of grouped) {
+            const first = group[0]!;
+            const previewSource = group.find((c) => c.body.trim())?.body ?? "";
+            const preview = previewSource.split("\n")[0] ?? "";
+            annotations.push({
+                side: first.side,
+                lineNumber: first.lineNumber,
+                metadata: {
+                    kind: "existing",
+                    commentIds: group.map((c) => c.id),
+                    preview,
+                    staleCount: 0,
+                },
+            });
+        }
+
+        if (activeDraft && activeDraft.filePath === file.path) {
+            const draftKey = commentKey({
+                filePath: activeDraft.filePath,
+                side: activeDraft.side,
+                lineNumber: activeDraft.lineNumber,
+            });
+            if (!grouped.has(draftKey)) {
+                annotations.push({
+                    side: activeDraft.side,
+                    lineNumber: activeDraft.lineNumber,
+                    metadata: { kind: "draft" },
+                });
+            }
+        }
+
+        return annotations;
+    }, [comments, activeDraft, file.path]);
+
+    const handleGutterClick = useCallback(
+        (getHover: () => { lineNumber: number; side: CommentSide } | undefined) => {
+            const hover = getHover();
+            if (!hover) return;
+            const derived = deriveLineType(file, hover.side, hover.lineNumber);
+            if (!derived) return;
+            onRequestDraft({
+                filePath: file.path,
+                side: hover.side,
+                lineNumber: hover.lineNumber,
+                lineType: derived.lineType,
+                lineText: derived.lineText,
+            });
+        },
+        [file, onRequestDraft],
+    );
 
     return (
         <div
@@ -69,7 +180,6 @@ export function FileCard({ file, open, onOpenChange, viewMode, wrap }: Props) {
             className="bg-card/80 group/card border-border/70 hover:border-border relative scroll-mt-14 overflow-clip rounded-lg border transition-colors"
             data-file-path={file.path}
         >
-            {/* status accent stripe (left edge) */}
             <span
                 aria-hidden
                 className={cn("absolute inset-y-0 left-0 w-0.5", STATUS_STRIPE[file.status])}
@@ -106,6 +216,11 @@ export function FileCard({ file, open, onOpenChange, viewMode, wrap }: Props) {
                         </button>
                     </CollapsibleTrigger>
                     <div className="flex shrink-0 items-center gap-2.5">
+                        {comments.length > 0 ? (
+                            <Badge variant="outline" className="font-mono text-[10px]">
+                                {comments.length} comment{comments.length === 1 ? "" : "s"}
+                            </Badge>
+                        ) : null}
                         <Badge variant={STATUS_VARIANT[file.status]} dot>
                             {file.status}
                         </Badge>
@@ -139,13 +254,57 @@ export function FileCard({ file, open, onOpenChange, viewMode, wrap }: Props) {
                             </div>
                         ) : (
                             <div className="border-border/60 bg-background/40 overflow-x-auto rounded-md border">
-                                <PatchDiff
+                                <PatchDiff<AnnotationMeta>
                                     patch={file.rawPatch}
                                     options={{
                                         diffStyle: viewMode,
                                         disableFileHeader: true,
                                         overflow: wrap ? "wrap" : "scroll",
+                                        enableGutterUtility: true,
                                     }}
+                                    lineAnnotations={lineAnnotations}
+                                    renderAnnotation={(a) => {
+                                        if (a.metadata.kind === "draft") {
+                                            return (
+                                                <CommentComposer
+                                                    onSave={onSaveDraft}
+                                                    onCancel={onCancelDraft}
+                                                />
+                                            );
+                                        }
+                                        return (
+                                            <CommentIndicator
+                                                count={a.metadata.commentIds.length}
+                                                preview={a.metadata.preview}
+                                                onClick={() => {
+                                                    const id =
+                                                        a.metadata.kind === "existing"
+                                                            ? a.metadata.commentIds[0]
+                                                            : undefined;
+                                                    if (id) onFocusComment(id);
+                                                }}
+                                            />
+                                        );
+                                    }}
+                                    renderGutterUtility={(getHover) => (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleGutterClick(getHover)}
+                                            style={{
+                                                width: "calc(1lh - 2px)",
+                                                height: "calc(1lh - 2px)",
+                                                marginRight: "calc(1ch - 1lh + 1px)",
+                                                marginTop: "1px",
+                                                boxShadow:
+                                                    "0 0 0 1px color-mix(in oklab, var(--color-primary) 65%, transparent), 0 2px 6px -2px color-mix(in oklab, var(--color-primary) 50%, transparent), inset 0 1px 0 0 rgba(255,255,255,0.18)",
+                                            }}
+                                            className="bg-primary text-primary-foreground hover:bg-primary/90 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 inline-flex shrink-0 items-center justify-center rounded-md transition-[transform,background-color] duration-100 ease-out hover:scale-105 active:scale-95"
+                                            title="Add comment to this line"
+                                            aria-label="Add comment to this line"
+                                        >
+                                            <Plus className="size-3" strokeWidth={3} />
+                                        </button>
+                                    )}
                                 />
                             </div>
                         )}
