@@ -107,7 +107,7 @@ export function Header({
     );
 
     return (
-        <header className="bg-background/70 supports-[backdrop-filter]:bg-background/55 relative sticky top-0 isolate z-20 flex h-14 items-center justify-between gap-4 border-b px-4 backdrop-blur-xl">
+        <header className="bg-background/70 supports-[backdrop-filter]:bg-background/55 isolate z-20 flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4 backdrop-blur-xl">
             <div className="flex min-w-0 items-center gap-3">
                 <div className="flex items-center gap-2">
                     <span className="text-primary bg-primary/10 ring-primary/25 inline-flex size-7 items-center justify-center rounded-md ring-1">

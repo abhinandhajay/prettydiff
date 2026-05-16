@@ -228,7 +228,7 @@ export function FileCard({
     return (
         <div
             id={fileCardId(file.path)}
-            className="bg-card/80 group/card border-border/70 hover:border-border relative scroll-mt-14 overflow-clip rounded-lg border transition-colors"
+            className="bg-card/80 group/card border-border/70 hover:border-border relative overflow-clip rounded-lg border transition-colors"
             data-file-path={file.path}
         >
             <span
@@ -236,7 +236,7 @@ export function FileCard({
                 className={cn("absolute inset-y-0 left-0 w-0.5", STATUS_STRIPE[file.status])}
             />
             <Collapsible open={open} onOpenChange={onOpenChange}>
-                <div className="bg-card/90 border-border/60 sticky top-14 z-10 flex items-center justify-between gap-3 border-b px-3 py-2 pl-4 backdrop-blur">
+                <div className="bg-card/90 border-border/60 sticky top-0 z-10 flex items-center justify-between gap-3 border-b px-3 py-2 pl-4 backdrop-blur">
                     <CollapsibleTrigger asChild>
                         <button className="flex min-w-0 flex-1 items-center gap-2 text-left">
                             {open ? (

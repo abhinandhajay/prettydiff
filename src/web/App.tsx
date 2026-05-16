@@ -43,6 +43,8 @@ export default function App() {
     const [scrollToCommentId, setScrollToCommentId] = useState<string | null>(null);
     const [diffFlashCommentId, setDiffFlashCommentId] = useState<string | null>(null);
 
+    const mainRef = useRef<HTMLElement>(null);
+
     const commentsRef = useRef(comments);
     useEffect(() => {
         commentsRef.current = comments;
@@ -134,10 +136,12 @@ export default function App() {
 
     useEffect(() => {
         if (!payload) return;
-        const cards = Array.from(document.querySelectorAll<HTMLElement>("[data-file-path]"));
+        const main = mainRef.current;
+        if (!main) return;
+        const cards = Array.from(main.querySelectorAll<HTMLElement>("[data-file-path]"));
         if (cards.length === 0) return;
         let raf = 0;
-        const STICKY_OFFSET = 56;
+        const STICKY_OFFSET = main.getBoundingClientRect().top;
         const compute = () => {
             raf = 0;
             let active: string | null = cards[0]?.dataset.filePath ?? null;
@@ -155,11 +159,11 @@ export default function App() {
             raf = window.requestAnimationFrame(compute);
         };
         schedule();
-        window.addEventListener("scroll", schedule, { passive: true });
+        main.addEventListener("scroll", schedule, { passive: true });
         const ro = new ResizeObserver(schedule);
         cards.forEach((c) => ro.observe(c));
         return () => {
-            window.removeEventListener("scroll", schedule);
+            main.removeEventListener("scroll", schedule);
             ro.disconnect();
             if (raf) window.cancelAnimationFrame(raf);
         };
@@ -335,14 +339,22 @@ export default function App() {
     }, [comments, activeDraft]);
 
     if (error) {
-        return <EmptyState kind="error" title="Couldn't load diff" message={error} />;
+        return (
+            <div className="bg-background flex min-h-screen flex-col">
+                <EmptyState kind="error" title="Couldn't load diff" message={error} />
+            </div>
+        );
     }
     if (!payload) {
-        return <EmptyState kind="loading" title="Loading…" />;
+        return (
+            <div className="bg-background flex min-h-screen flex-col">
+                <EmptyState kind="loading" title="Loading…" />
+            </div>
+        );
     }
 
     return (
-        <div className="bg-background flex min-h-screen flex-col">
+        <div className="bg-background flex h-screen flex-col overflow-hidden">
             <Header
                 payload={payload}
                 viewMode={viewMode}
@@ -361,7 +373,7 @@ export default function App() {
                 <EmptyState kind="empty" title="No changes" message="Working tree matches HEAD." />
             ) : (
                 <div
-                    className="relative grid flex-1 transition-[grid-template-columns] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                    className="grid min-h-0 flex-1 transition-[grid-template-columns] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]"
                     style={{
                         gridTemplateColumns: `276px 1fr ${showCommentsSidebar ? "340px" : "0px"}`,
                     }}
@@ -371,32 +383,34 @@ export default function App() {
                         activePath={activePath}
                         onScrollTo={scrollToFile}
                     />
-                    <main className="space-y-3 px-5 py-5">
-                        {sortedFiles.map((f) => (
-                            <FileCard
-                                key={f.path}
-                                file={f}
-                                open={openMap[f.path] ?? true}
-                                onOpenChange={(o) => setOpen(f.path, o)}
-                                viewMode={viewMode}
-                                wrap={wrap}
-                                comments={comments[f.path] ?? []}
-                                activeDraft={
-                                    activeDraft && activeDraft.filePath === f.path
-                                        ? activeDraft
-                                        : null
-                                }
-                                onRequestDraft={requestDraft}
-                                onCancelDraft={cancelDraft}
-                                onSaveDraft={saveDraft}
-                                onFocusComment={focusComment}
-                                onEditComment={editComment}
-                                onDeleteComment={deleteComment}
-                                flashCommentId={diffFlashCommentId}
-                            />
-                        ))}
+                    <main ref={mainRef} className="min-h-0 overflow-y-auto">
+                        <div className="space-y-3 px-5 py-5">
+                            {sortedFiles.map((f) => (
+                                <FileCard
+                                    key={f.path}
+                                    file={f}
+                                    open={openMap[f.path] ?? true}
+                                    onOpenChange={(o) => setOpen(f.path, o)}
+                                    viewMode={viewMode}
+                                    wrap={wrap}
+                                    comments={comments[f.path] ?? []}
+                                    activeDraft={
+                                        activeDraft && activeDraft.filePath === f.path
+                                            ? activeDraft
+                                            : null
+                                    }
+                                    onRequestDraft={requestDraft}
+                                    onCancelDraft={cancelDraft}
+                                    onSaveDraft={saveDraft}
+                                    onFocusComment={focusComment}
+                                    onEditComment={editComment}
+                                    onDeleteComment={deleteComment}
+                                    flashCommentId={diffFlashCommentId}
+                                />
+                            ))}
+                        </div>
                     </main>
-                    <div className="sticky top-14 h-[calc(100vh-3.5rem)] self-start overflow-hidden">
+                    <div className="h-full overflow-hidden">
                         <CommentsSidebar
                             open={showCommentsSidebar}
                             comments={comments}
