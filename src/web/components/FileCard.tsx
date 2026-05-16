@@ -23,6 +23,7 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     viewMode: ViewMode;
+    wrap: boolean;
 }
 
 const STATUS_VARIANT: Record<
@@ -59,7 +60,7 @@ function splitPath(path: string): { dir: string; base: string } {
     return { dir: path.slice(0, idx + 1), base: path.slice(idx + 1) };
 }
 
-export function FileCard({ file, open, onOpenChange, viewMode }: Props) {
+export function FileCard({ file, open, onOpenChange, viewMode, wrap }: Props) {
     const { dir, base } = splitPath(file.path);
 
     return (
@@ -140,7 +141,11 @@ export function FileCard({ file, open, onOpenChange, viewMode }: Props) {
                             <div className="border-border/60 bg-background/40 overflow-x-auto rounded-md border">
                                 <PatchDiff
                                     patch={file.rawPatch}
-                                    options={{ diffStyle: viewMode, disableFileHeader: true }}
+                                    options={{
+                                        diffStyle: viewMode,
+                                        disableFileHeader: true,
+                                        overflow: wrap ? "wrap" : "scroll",
+                                    }}
                                 />
                             </div>
                         )}

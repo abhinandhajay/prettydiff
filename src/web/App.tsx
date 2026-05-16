@@ -16,6 +16,7 @@ export default function App() {
     const [error, setError] = useState<string | null>(null);
     const [isReloading, setIsReloading] = useState(false);
     const [viewMode, setViewMode] = usePersistedState<ViewMode>("prettydiff:view", "unified");
+    const [wrap, setWrap] = usePersistedState<boolean>("prettydiff:wrap", false);
     const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
     const [activePath, setActivePath] = useState<string | null>(null);
 
@@ -132,6 +133,8 @@ export default function App() {
                 payload={payload}
                 viewMode={viewMode}
                 onViewModeChange={setViewMode}
+                wrap={wrap}
+                onWrapChange={setWrap}
                 onExpandAll={expandAll}
                 onCollapseAll={collapseAll}
                 onReload={reload}
@@ -154,6 +157,7 @@ export default function App() {
                                 open={openMap[f.path] ?? true}
                                 onOpenChange={(o) => setOpen(f.path, o)}
                                 viewMode={viewMode}
+                                wrap={wrap}
                             />
                         ))}
                     </main>

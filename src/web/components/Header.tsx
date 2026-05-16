@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
-import { GitBranch, ChevronsDownUp, ChevronsUpDown, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { GitBranch, ChevronsDownUp, ChevronsUpDown, RefreshCw, WrapText } from "lucide-react";
 import { useMemo } from "react";
 
 import type { DiffPayload } from "@/lib/types";
@@ -9,6 +10,8 @@ interface Props {
     payload: DiffPayload;
     viewMode: ViewMode;
     onViewModeChange: (v: ViewMode) => void;
+    wrap: boolean;
+    onWrapChange: (w: boolean) => void;
     onExpandAll: () => void;
     onCollapseAll: () => void;
     onReload: () => void;
@@ -69,6 +72,8 @@ export function Header({
     payload,
     viewMode,
     onViewModeChange,
+    wrap,
+    onWrapChange,
     onExpandAll,
     onCollapseAll,
     onReload,
@@ -149,6 +154,19 @@ export function Header({
                         className="text-muted-foreground hover:text-foreground"
                     >
                         <RefreshCw className={isReloading ? "animate-spin" : undefined} />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onWrapChange(!wrap)}
+                        aria-pressed={wrap}
+                        title={wrap ? "Disable line wrapping" : "Enable line wrapping"}
+                        className={cn(
+                            "text-muted-foreground hover:text-foreground",
+                            wrap && "text-foreground bg-muted/60",
+                        )}
+                    >
+                        <WrapText />
                     </Button>
                     <Button
                         variant="ghost"
