@@ -1,3 +1,4 @@
+import { commentIndicatorDomId } from "@/components/CommentIndicator";
 import { CommentsSidebar } from "@/components/CommentsSidebar";
 import { EmptyState } from "@/components/EmptyState";
 import { FileCard } from "@/components/FileCard";
@@ -40,6 +41,7 @@ export default function App() {
     const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set());
     const [activeDraft, setActiveDraft] = useState<DraftLine | null>(null);
     const [scrollToCommentId, setScrollToCommentId] = useState<string | null>(null);
+    const [diffFlashCommentId, setDiffFlashCommentId] = useState<string | null>(null);
 
     const commentsRef = useRef(comments);
     useEffect(() => {
@@ -282,6 +284,40 @@ export default function App() {
 
     const clearScrollTarget = useCallback(() => setScrollToCommentId(null), []);
 
+    const jumpToDiffComment = useCallback((id: string) => {
+        let filePath: string | null = null;
+        for (const [path, list] of Object.entries(commentsRef.current)) {
+            if (list.some((c) => c.id === id)) {
+                filePath = path;
+                break;
+            }
+        }
+        if (!filePath) return;
+        setOpenMap((m) => (m[filePath!] ? m : { ...m, [filePath!]: true }));
+        setDiffFlashCommentId(id);
+    }, []);
+
+    useEffect(() => {
+        if (!diffFlashCommentId) return;
+        let cancelled = false;
+        let attempts = 0;
+        const tryScroll = () => {
+            if (cancelled) return;
+            const el = document.getElementById(commentIndicatorDomId(diffFlashCommentId));
+            if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+            }
+            if (attempts++ < 30) requestAnimationFrame(tryScroll);
+        };
+        requestAnimationFrame(tryScroll);
+        const t = window.setTimeout(() => setDiffFlashCommentId(null), 1400);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(t);
+        };
+    }, [diffFlashCommentId]);
+
     // When a draft becomes active, ensure that file is expanded so the composer is visible.
     useEffect(() => {
         if (!activeDraft) return;
@@ -356,6 +392,7 @@ export default function App() {
                                 onFocusComment={focusComment}
                                 onEditComment={editComment}
                                 onDeleteComment={deleteComment}
+                                flashCommentId={diffFlashCommentId}
                             />
                         ))}
                     </main>
@@ -371,6 +408,7 @@ export default function App() {
                             onCopy={copySelected}
                             scrollToId={scrollToCommentId}
                             onScrollHandled={clearScrollTarget}
+                            onJumpToDiff={jumpToDiffComment}
                         />
                     </div>
                 </div>

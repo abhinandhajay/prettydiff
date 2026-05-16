@@ -69,6 +69,7 @@ interface Props {
     onFocusComment: (id: string) => void;
     onEditComment: (id: string, body: string) => void;
     onDeleteComment: (id: string) => void;
+    flashCommentId: string | null;
 }
 
 const STATUS_VARIANT: Record<
@@ -140,6 +141,7 @@ export function FileCard({
     onFocusComment,
     onEditComment,
     onDeleteComment,
+    flashCommentId,
 }: Props) {
     const { dir, base } = splitPath(file.path);
 
@@ -322,6 +324,7 @@ export function FileCard({
                                                 onEdit={onEditComment}
                                                 onDelete={onDeleteComment}
                                                 onFocusInSidebar={onFocusComment}
+                                                flash={flashCommentId === a.metadata.comment.id}
                                             />
                                         );
                                     }}

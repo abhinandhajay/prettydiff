@@ -13,17 +13,24 @@ interface Props {
     onEdit: (id: string, body: string) => void;
     onDelete: (id: string) => void;
     onFocusInSidebar: (id: string) => void;
+    flash?: boolean;
 }
 
-export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar }: Props) {
+export function commentIndicatorDomId(id: string): string {
+    return `comment-line-${id}`;
+}
+
+export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar, flash }: Props) {
     const [editing, setEditing] = useState(false);
     const stale = Boolean(comment.stale);
 
     return (
         <div
+            id={commentIndicatorDomId(comment.id)}
             className={cn(
                 "border-primary/20 bg-card mx-3 mt-0 mb-2 overflow-hidden rounded-lg rounded-t-none border border-t-0",
                 stale && "opacity-60",
+                flash && "ring-primary/60 ring-2 ring-offset-1 ring-offset-transparent",
             )}
         >
             <div className="px-3 pt-2.5 pb-2">
@@ -61,7 +68,7 @@ export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar }
                         <button
                             type="button"
                             onClick={() => onFocusInSidebar(comment.id)}
-                            className="text-muted-foreground/80 hover:text-foreground/90 truncate text-[10.5px] underline-offset-2 transition-colors hover:underline"
+                            className="text-muted-foreground/80 hover:text-foreground/90 font-sans text-[10.5px] underline-offset-2 transition-colors hover:underline"
                             title="Show in sidebar"
                         >
                             open in sidebar

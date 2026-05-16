@@ -30,6 +30,7 @@ interface Props {
     onCopy: () => void;
     scrollToId: string | null;
     onScrollHandled: () => void;
+    onJumpToDiff: (id: string) => void;
     open: boolean;
 }
 
@@ -65,6 +66,7 @@ export function CommentsSidebar({
     onCopy,
     scrollToId,
     onScrollHandled,
+    onJumpToDiff,
     open,
 }: Props) {
     const groups = useMemo(() => groupByFile(comments), [comments]);
@@ -134,7 +136,7 @@ export function CommentsSidebar({
                     </p>
                 </div>
             ) : (
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]>div]:block!">
                     <div className="px-2 py-2">
                         {groups.map((g) => (
                             <FileGroupBlock
@@ -146,6 +148,7 @@ export function CommentsSidebar({
                                 onToggleFile={onToggleFile}
                                 onEdit={onEdit}
                                 onDelete={onDelete}
+                                onJumpToDiff={onJumpToDiff}
                                 registerRow={(id, el) => {
                                     if (el) rowRefs.current.set(id, el);
                                     else rowRefs.current.delete(id);
@@ -192,6 +195,7 @@ interface FileGroupProps {
     onToggleFile: (filePath: string, select: boolean) => void;
     onEdit: (id: string, body: string) => void;
     onDelete: (id: string) => void;
+    onJumpToDiff: (id: string) => void;
     registerRow: (id: string, el: HTMLDivElement | null) => void;
 }
 
@@ -203,6 +207,7 @@ function FileGroupBlock({
     onToggleFile,
     onEdit,
     onDelete,
+    onJumpToDiff,
     registerRow,
 }: FileGroupProps) {
     const [open, setOpen] = useState(true);
@@ -257,6 +262,7 @@ function FileGroupBlock({
                             onToggle={() => onToggleSelected(c.id)}
                             onEdit={(body) => onEdit(c.id, body)}
                             onDelete={() => onDelete(c.id)}
+                            onJumpToDiff={() => onJumpToDiff(c.id)}
                             register={(el) => registerRow(c.id, el)}
                         />
                     ))}
@@ -273,6 +279,7 @@ interface CommentRowProps {
     onToggle: () => void;
     onEdit: (body: string) => void;
     onDelete: () => void;
+    onJumpToDiff: () => void;
     register: (el: HTMLDivElement | null) => void;
 }
 
@@ -283,6 +290,7 @@ function CommentRow({
     onToggle,
     onEdit,
     onDelete,
+    onJumpToDiff,
     register,
 }: CommentRowProps) {
     const [editing, setEditing] = useState(false);
@@ -298,7 +306,7 @@ function CommentRow({
         <div
             ref={register}
             className={cn(
-                "relative overflow-hidden rounded-lg border transition-[box-shadow,background-color,border-color]",
+                "relative mr-3 overflow-hidden rounded-lg border transition-[box-shadow,background-color,border-color]",
                 "border-border/50 bg-card",
                 checked && !comment.stale && "border-primary/40 bg-primary/4",
                 comment.stale && "opacity-60",
@@ -367,9 +375,19 @@ function CommentRow({
             </div>
             {!editing ? (
                 <div className="from-primary/3 to-primary/0 border-border/50 flex items-center justify-between gap-2 border-t bg-linear-to-b px-2.5 py-1">
-                    <span className="text-muted-foreground/70 font-mono text-[10.5px] tabular-nums">
-                        {formatRelativeTime(comment.createdAt)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground/70 font-mono text-[10.5px] tabular-nums">
+                            {formatRelativeTime(comment.createdAt)}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={onJumpToDiff}
+                            className="text-muted-foreground/80 hover:text-foreground/90 text-[10.5px] underline-offset-2 transition-colors hover:underline"
+                            title="Show in diff"
+                        >
+                            show in diff
+                        </button>
+                    </div>
                     <div className="flex shrink-0 items-center gap-0.5">
                         {!comment.stale ? (
                             <Button
