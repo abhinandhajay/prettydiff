@@ -200,29 +200,31 @@ export function Header({
                     >
                         <ChevronsDownUp />
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onShowCommentsChange(!showComments)}
-                        aria-pressed={showComments}
-                        title={showComments ? "Hide comments sidebar" : "Show comments sidebar"}
-                        className={cn(
-                            "relative text-muted-foreground hover:text-foreground",
-                            showComments && "text-foreground bg-muted/60",
-                        )}
-                    >
-                        <MessageSquare />
-                        {commentCount > 0 ? (
-                            <Badge
-                                variant="secondary"
-                                className="pointer-events-none absolute -top-1 -right-1 h-4 min-w-4 rounded-full px-1 font-mono text-[9px] tabular-nums"
-                            >
-                                {commentCount}
-                            </Badge>
-                        ) : null}
-                    </Button>
                 </div>
                 <ViewToggle value={viewMode} onChange={onViewModeChange} />
+                <Divider />
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onShowCommentsChange(!showComments)}
+                    aria-pressed={showComments}
+                    title={showComments ? "Hide comments sidebar" : "Show comments sidebar"}
+                    className={cn(
+                        "relative text-muted-foreground hover:text-foreground",
+                        showComments && "text-foreground bg-muted/60",
+                    )}
+                >
+                    <MessageSquare />
+                    <span className="ml-1.5 hidden sm:inline">Comments</span>
+                    {commentCount > 0 ? (
+                        <Badge
+                            variant="secondary"
+                            className="pointer-events-none absolute -top-1 -right-1 h-4 min-w-4 rounded-full px-1 font-mono text-[9px] tabular-nums"
+                        >
+                            {commentCount}
+                        </Badge>
+                    ) : null}
+                </Button>
             </div>
         </header>
     );
