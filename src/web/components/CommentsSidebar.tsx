@@ -1,20 +1,20 @@
+import { InlineCommentEditor } from "@/components/InlineCommentEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
+import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
     ChevronDown,
     ChevronRight,
-    Check,
     Copy,
     Pencil,
     Trash2,
-    X,
     MessageSquareOff,
+    FolderClosed,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -30,6 +30,7 @@ interface Props {
     onCopy: () => void;
     scrollToId: string | null;
     onScrollHandled: () => void;
+    open: boolean;
 }
 
 interface FileGroup {
@@ -64,6 +65,7 @@ export function CommentsSidebar({
     onCopy,
     scrollToId,
     onScrollHandled,
+    open,
 }: Props) {
     const groups = useMemo(() => groupByFile(comments), [comments]);
     const totalCount = useMemo(
@@ -97,14 +99,27 @@ export function CommentsSidebar({
     }, [scrollToId, onScrollHandled]);
 
     return (
-        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border sticky top-14 flex h-[calc(100vh-3.5rem)] min-h-0 flex-col self-start overflow-hidden border-l">
+        <aside
+            data-state={open ? "open" : "closed"}
+            className={cn(
+                "bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full w-[340px] min-h-0 flex-col overflow-hidden border-l",
+                "transition-[transform,opacity] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                "data-[state=closed]:translate-x-full data-[state=closed]:opacity-0",
+                "data-[state=closed]:pointer-events-none",
+            )}
+            aria-hidden={!open}
+        >
             <div className="border-sidebar-border flex h-12 shrink-0 items-center justify-between border-b px-3">
                 <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-[10.5px] font-medium tracking-[0.12em] uppercase">
+                    <span className="text-primary text-[11px] leading-none">◆</span>
+                    <span className="text-foreground/85 text-[11px] font-medium tracking-[0.14em] uppercase">
                         Comments
                     </span>
                     {totalCount > 0 ? (
-                        <Badge variant="outline" className="font-mono text-[10.5px]">
+                        <Badge
+                            variant="outline"
+                            className="ml-1 font-mono text-[10.5px] tabular-nums"
+                        >
                             {totalCount}
                         </Badge>
                     ) : null}
@@ -112,9 +127,11 @@ export function CommentsSidebar({
             </div>
 
             {totalCount === 0 ? (
-                <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-[12px]">
+                <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
                     <MessageSquareOff className="size-5 opacity-60" />
-                    <p>Hover a line and click the + to leave a comment.</p>
+                    <p className="text-foreground/70 max-w-55 text-[12.5px] leading-snug">
+                        Hover a line, tap +, leave a note.
+                    </p>
                 </div>
             ) : (
                 <ScrollArea className="flex-1">
@@ -141,7 +158,18 @@ export function CommentsSidebar({
 
             <Separator />
             <div className="border-sidebar-border flex shrink-0 items-center justify-between gap-2 border-t px-3 py-2">
-                <span className="text-muted-foreground text-[11px]">{selectedCount} selected</span>
+                <span className="text-muted-foreground text-[11px]">
+                    {selectedCount > 0 ? (
+                        <>
+                            <span className="text-foreground/90 font-mono tabular-nums">
+                                {selectedCount}
+                            </span>{" "}
+                            selected · ready to copy
+                        </>
+                    ) : (
+                        "Nothing selected"
+                    )}
+                </span>
                 <Button
                     size="sm"
                     onClick={onCopy}
@@ -149,7 +177,7 @@ export function CommentsSidebar({
                     className="gap-1.5"
                 >
                     <Copy className="size-3.5" />
-                    Copy selected
+                    Copy for agent
                 </Button>
             </div>
         </aside>
@@ -190,8 +218,8 @@ function FileGroupBlock({
                 : "indeterminate";
 
     return (
-        <Collapsible open={open} onOpenChange={setOpen} className="mb-1">
-            <div className="hover:bg-muted/40 flex items-center gap-1.5 rounded-md px-1 py-1">
+        <Collapsible open={open} onOpenChange={setOpen} className="mb-1.5">
+            <div className="hover:bg-muted/40 flex items-center gap-1.5 rounded-md px-1.5 py-1.5">
                 <Checkbox
                     checked={headerCheckState}
                     onCheckedChange={(v) => onToggleFile(group.path, v === true)}
@@ -205,19 +233,20 @@ function FileGroupBlock({
                         ) : (
                             <ChevronRight className="text-muted-foreground/70 size-3.5 shrink-0" />
                         )}
+                        <FolderClosed className="text-muted-foreground/60 size-3 shrink-0" />
                         <span
                             className="text-foreground/90 truncate font-mono text-[12px]"
                             title={group.path}
                         >
                             {group.path}
                         </span>
-                        <Badge variant="outline" className="ml-auto shrink-0 text-[10px]">
+                        <span className="bg-muted/40 text-muted-foreground/90 ml-auto shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] tabular-nums">
                             {group.comments.length}
-                        </Badge>
+                        </span>
                     </button>
                 </CollapsibleTrigger>
             </div>
-            <CollapsibleContent>
+            <CollapsibleContent className="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden">
                 <div className="ml-5 flex flex-col gap-1.5 py-1">
                     {group.comments.map((c) => (
                         <CommentRow
@@ -257,11 +286,6 @@ function CommentRow({
     register,
 }: CommentRowProps) {
     const [editing, setEditing] = useState(false);
-    const [draft, setDraft] = useState(comment.body);
-
-    useEffect(() => {
-        if (!editing) setDraft(comment.body);
-    }, [editing, comment.body]);
 
     const sideMark =
         comment.lineType === "change-addition"
@@ -274,22 +298,17 @@ function CommentRow({
         <div
             ref={register}
             className={cn(
-                "border-border/60 bg-background/40 rounded-md border p-2 transition-shadow",
+                "relative rounded-md border p-2 transition-[box-shadow,background-color,border-color]",
+                "border-border/50 bg-card/50",
+                checked && !comment.stale && "border-primary/40 bg-primary/4",
                 comment.stale && "opacity-60",
                 flash && "ring-primary/60 ring-2 ring-offset-1 ring-offset-transparent",
             )}
         >
             <div className="flex items-start gap-2">
-                <Checkbox
-                    checked={checked}
-                    onCheckedChange={onToggle}
-                    disabled={comment.stale}
-                    className="mt-0.5"
-                    aria-label="Select comment"
-                />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 text-[11px]">
-                        <span className="text-muted-foreground font-mono">
+                        <span className="text-muted-foreground font-mono tabular-nums">
                             L{comment.lineNumber}
                         </span>
                         <span
@@ -306,7 +325,7 @@ function CommentRow({
                         </span>
                         {comment.stale ? (
                             <Badge variant="outline" className="text-[9.5px]">
-                                stale
+                                outdated
                             </Badge>
                         ) : null}
                         <div className="ml-auto flex items-center gap-0.5">
@@ -330,6 +349,13 @@ function CommentRow({
                             >
                                 <Trash2 className="size-3" />
                             </Button>
+                            <Checkbox
+                                checked={checked}
+                                onCheckedChange={onToggle}
+                                disabled={comment.stale}
+                                className="ml-1"
+                                aria-label="Select comment"
+                            />
                         </div>
                     </div>
                     <pre className="text-muted-foreground/80 mt-1 truncate font-mono text-[11px]">
@@ -337,55 +363,25 @@ function CommentRow({
                     </pre>
                     {editing ? (
                         <div className="mt-1.5">
-                            <Textarea
-                                value={draft}
-                                onChange={(e) => setDraft(e.target.value)}
-                                rows={3}
-                                className="min-h-14 resize-y text-[12px]"
-                                autoFocus
-                                onKeyDown={(e) => {
-                                    if (e.key === "Escape") {
-                                        e.preventDefault();
-                                        setEditing(false);
-                                    } else if (
-                                        e.key === "Enter" &&
-                                        (e.metaKey || e.ctrlKey) &&
-                                        draft.trim()
-                                    ) {
-                                        e.preventDefault();
-                                        onEdit(draft.trim());
-                                        setEditing(false);
-                                    }
+                            <InlineCommentEditor
+                                initialValue={comment.body}
+                                onSave={(body) => {
+                                    onEdit(body);
+                                    setEditing(false);
                                 }}
+                                onCancel={() => setEditing(false)}
+                                rows={3}
                             />
-                            <div className="mt-1 flex items-center justify-end gap-1">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-6"
-                                    onClick={() => setEditing(false)}
-                                    title="Cancel"
-                                >
-                                    <X className="size-3" />
-                                </Button>
-                                <Button
-                                    size="icon"
-                                    className="size-6"
-                                    disabled={!draft.trim()}
-                                    onClick={() => {
-                                        onEdit(draft.trim());
-                                        setEditing(false);
-                                    }}
-                                    title="Save"
-                                >
-                                    <Check className="size-3" />
-                                </Button>
-                            </div>
                         </div>
                     ) : (
-                        <p className="text-foreground/85 mt-1 text-[12.5px] whitespace-pre-wrap">
-                            {comment.body}
-                        </p>
+                        <>
+                            <p className="text-foreground/85 mt-1 text-[12.5px] whitespace-pre-wrap">
+                                {comment.body}
+                            </p>
+                            <p className="text-muted-foreground/70 mt-1 font-mono text-[10.5px]">
+                                {formatRelativeTime(comment.createdAt)}
+                            </p>
+                        </>
                     )}
                 </div>
             </div>

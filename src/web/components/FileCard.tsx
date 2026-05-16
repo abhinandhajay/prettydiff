@@ -18,7 +18,29 @@ import {
     ArrowRight,
     Plus,
 } from "lucide-react";
-import { useCallback, useMemo } from "react";
+
+function GutterAddButton({ onClick }: { onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            style={{
+                width: "calc(1lh - 2px)",
+                height: "calc(1lh - 2px)",
+                marginRight: "calc(1ch - 1lh + 1px)",
+                marginTop: "1px",
+                boxShadow:
+                    "0 0 0 1px color-mix(in oklab, var(--color-primary) 65%, transparent), 0 2px 6px -2px color-mix(in oklab, var(--color-primary) 50%, transparent), inset 0 1px 0 0 rgba(255,255,255,0.18)",
+            }}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 inline-flex shrink-0 items-center justify-center rounded-md transition-[transform,background-color] duration-100 ease-out hover:scale-105 active:scale-95"
+            title="Add comment to this line"
+            aria-label="Add comment to this line"
+        >
+            <Plus className="size-3" strokeWidth={3} />
+        </button>
+    );
+}
+import { useCallback, useMemo, useState } from "react";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type {
@@ -31,9 +53,7 @@ import type {
 } from "@/lib/types";
 import type { DiffLineAnnotation } from "@pierre/diffs";
 
-type AnnotationMeta =
-    | { kind: "draft" }
-    | { kind: "existing"; commentIds: string[]; preview: string; staleCount: number };
+type AnnotationMeta = { kind: "draft" } | { kind: "existing"; comment: DiffComment };
 
 interface Props {
     file: ParsedFile;
@@ -47,6 +67,8 @@ interface Props {
     onCancelDraft: () => void;
     onSaveDraft: (body: string) => void;
     onFocusComment: (id: string) => void;
+    onEditComment: (id: string, body: string) => void;
+    onDeleteComment: (id: string) => void;
 }
 
 const STATUS_VARIANT: Record<
@@ -116,6 +138,8 @@ export function FileCard({
     onCancelDraft,
     onSaveDraft,
     onFocusComment,
+    onEditComment,
+    onDeleteComment,
 }: Props) {
     const { dir, base } = splitPath(file.path);
 
@@ -125,17 +149,10 @@ export function FileCard({
 
         for (const [, group] of grouped) {
             const first = group[0]!;
-            const previewSource = group.find((c) => c.body.trim())?.body ?? "";
-            const preview = previewSource.split("\n")[0] ?? "";
             annotations.push({
                 side: first.side,
                 lineNumber: first.lineNumber,
-                metadata: {
-                    kind: "existing",
-                    commentIds: group.map((c) => c.id),
-                    preview,
-                    staleCount: 0,
-                },
+                metadata: { kind: "existing", comment: first },
             });
         }
 
@@ -173,6 +190,38 @@ export function FileCard({
         },
         [file, onRequestDraft],
     );
+
+    const [hoveredLine, setHoveredLine] = useState<{
+        lineNumber: number;
+        side: CommentSide;
+    } | null>(null);
+
+    const handleLineEnter = useCallback(
+        (props: { lineNumber: number; annotationSide: CommentSide }) => {
+            setHoveredLine({ lineNumber: props.lineNumber, side: props.annotationSide });
+        },
+        [],
+    );
+    const handleLineLeave = useCallback(() => setHoveredLine(null), []);
+
+    const diffOptions = useMemo(
+        () => ({
+            diffStyle: viewMode,
+            disableFileHeader: true,
+            overflow: (wrap ? "wrap" : "scroll") as "wrap" | "scroll",
+            enableGutterUtility: true,
+            onLineEnter: handleLineEnter,
+            onLineLeave: handleLineLeave,
+        }),
+        [viewMode, wrap, handleLineEnter, handleLineLeave],
+    );
+
+    const hoverOccupied = useMemo(() => {
+        if (!hoveredLine) return false;
+        return lineAnnotations.some(
+            (a) => a.side === hoveredLine.side && a.lineNumber === hoveredLine.lineNumber,
+        );
+    }, [hoveredLine, lineAnnotations]);
 
     return (
         <div
@@ -256,12 +305,7 @@ export function FileCard({
                             <div className="border-border/60 bg-background/40 overflow-x-auto rounded-md border">
                                 <PatchDiff<AnnotationMeta>
                                     patch={file.rawPatch}
-                                    options={{
-                                        diffStyle: viewMode,
-                                        disableFileHeader: true,
-                                        overflow: wrap ? "wrap" : "scroll",
-                                        enableGutterUtility: true,
-                                    }}
+                                    options={diffOptions}
                                     lineAnnotations={lineAnnotations}
                                     renderAnnotation={(a) => {
                                         if (a.metadata.kind === "draft") {
@@ -274,37 +318,20 @@ export function FileCard({
                                         }
                                         return (
                                             <CommentIndicator
-                                                count={a.metadata.commentIds.length}
-                                                preview={a.metadata.preview}
-                                                onClick={() => {
-                                                    const id =
-                                                        a.metadata.kind === "existing"
-                                                            ? a.metadata.commentIds[0]
-                                                            : undefined;
-                                                    if (id) onFocusComment(id);
-                                                }}
+                                                comment={a.metadata.comment}
+                                                onEdit={onEditComment}
+                                                onDelete={onDeleteComment}
+                                                onFocusInSidebar={onFocusComment}
                                             />
                                         );
                                     }}
-                                    renderGutterUtility={(getHover) => (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleGutterClick(getHover)}
-                                            style={{
-                                                width: "calc(1lh - 2px)",
-                                                height: "calc(1lh - 2px)",
-                                                marginRight: "calc(1ch - 1lh + 1px)",
-                                                marginTop: "1px",
-                                                boxShadow:
-                                                    "0 0 0 1px color-mix(in oklab, var(--color-primary) 65%, transparent), 0 2px 6px -2px color-mix(in oklab, var(--color-primary) 50%, transparent), inset 0 1px 0 0 rgba(255,255,255,0.18)",
-                                            }}
-                                            className="bg-primary text-primary-foreground hover:bg-primary/90 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 inline-flex shrink-0 items-center justify-center rounded-md transition-[transform,background-color] duration-100 ease-out hover:scale-105 active:scale-95"
-                                            title="Add comment to this line"
-                                            aria-label="Add comment to this line"
-                                        >
-                                            <Plus className="size-3" strokeWidth={3} />
-                                        </button>
-                                    )}
+                                    renderGutterUtility={(getHover) =>
+                                        hoverOccupied ? null : (
+                                            <GutterAddButton
+                                                onClick={() => handleGutterClick(getHover)}
+                                            />
+                                        )
+                                    }
                                 />
                             </div>
                         )}

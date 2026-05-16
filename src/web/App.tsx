@@ -305,8 +305,6 @@ export default function App() {
         return <EmptyState kind="loading" title="Loading…" />;
     }
 
-    const gridCols = showCommentsSidebar ? "276px 1fr 320px" : "276px 1fr";
-
     return (
         <div className="bg-background flex min-h-screen flex-col">
             <Header
@@ -326,7 +324,12 @@ export default function App() {
             {payload.files.length === 0 ? (
                 <EmptyState kind="empty" title="No changes" message="Working tree matches HEAD." />
             ) : (
-                <div className="relative grid flex-1" style={{ gridTemplateColumns: gridCols }}>
+                <div
+                    className="relative grid flex-1 transition-[grid-template-columns] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                    style={{
+                        gridTemplateColumns: `276px 1fr ${showCommentsSidebar ? "340px" : "0px"}`,
+                    }}
+                >
                     <FileTreeSidebar
                         files={sortedFiles}
                         activePath={activePath}
@@ -351,11 +354,14 @@ export default function App() {
                                 onCancelDraft={cancelDraft}
                                 onSaveDraft={saveDraft}
                                 onFocusComment={focusComment}
+                                onEditComment={editComment}
+                                onDeleteComment={deleteComment}
                             />
                         ))}
                     </main>
-                    {showCommentsSidebar ? (
+                    <div className="sticky top-14 h-[calc(100vh-3.5rem)] self-start overflow-hidden">
                         <CommentsSidebar
+                            open={showCommentsSidebar}
                             comments={comments}
                             selectedIds={selectedCommentIds}
                             onToggleSelected={toggleSelected}
@@ -366,7 +372,7 @@ export default function App() {
                             scrollToId={scrollToCommentId}
                             onScrollHandled={clearScrollTarget}
                         />
-                    ) : null}
+                    </div>
                 </div>
             )}
         </div>
