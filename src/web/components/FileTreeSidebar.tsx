@@ -103,7 +103,7 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
     );
 
     return (
-        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full min-h-0 flex-col overflow-hidden border-r">
+        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border sticky top-14 flex h-[calc(100vh-3.5rem)] min-h-0 flex-col self-start overflow-hidden border-r">
             <div className="border-sidebar-border flex h-12 shrink-0 items-center justify-between border-b px-3">
                 <div className="flex items-center gap-2">
                     <span className="text-muted-foreground text-[10.5px] font-medium tracking-[0.12em] uppercase">

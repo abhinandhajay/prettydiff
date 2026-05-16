@@ -6,7 +6,7 @@ import { fetchDiff } from "@/lib/fetchDiff";
 import { fileCardId } from "@/lib/slug";
 import { sortFilesForTree } from "@/lib/treeSort";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type { DiffPayload } from "@/lib/types";
@@ -84,19 +84,17 @@ export default function App() {
         });
     }, []);
 
-    const cardsRef = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
-        if (!payload || !cardsRef.current) return;
-        const root = cardsRef.current;
-        const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-file-path]"));
+        if (!payload) return;
+        const cards = Array.from(document.querySelectorAll<HTMLElement>("[data-file-path]"));
         if (cards.length === 0) return;
         let raf = 0;
+        const STICKY_OFFSET = 56;
         const compute = () => {
             raf = 0;
-            const rootTop = root.getBoundingClientRect().top;
             let active: string | null = cards[0]?.dataset.filePath ?? null;
             for (const card of cards) {
-                if (card.getBoundingClientRect().top - rootTop <= 1) {
+                if (card.getBoundingClientRect().top - STICKY_OFFSET <= 1) {
                     active = card.dataset.filePath ?? active;
                 } else {
                     break;
@@ -109,12 +107,11 @@ export default function App() {
             raf = window.requestAnimationFrame(compute);
         };
         schedule();
-        root.addEventListener("scroll", schedule, { passive: true });
+        window.addEventListener("scroll", schedule, { passive: true });
         const ro = new ResizeObserver(schedule);
-        ro.observe(root);
         cards.forEach((c) => ro.observe(c));
         return () => {
-            root.removeEventListener("scroll", schedule);
+            window.removeEventListener("scroll", schedule);
             ro.disconnect();
             if (raf) window.cancelAnimationFrame(raf);
         };
@@ -130,7 +127,7 @@ export default function App() {
     }
 
     return (
-        <div className="bg-background flex h-screen flex-col overflow-hidden">
+        <div className="bg-background flex min-h-screen flex-col">
             <Header
                 payload={payload}
                 viewMode={viewMode}
@@ -143,16 +140,13 @@ export default function App() {
             {payload.files.length === 0 ? (
                 <EmptyState kind="empty" title="No changes" message="Working tree matches HEAD." />
             ) : (
-                <div
-                    className="relative grid min-h-0 flex-1"
-                    style={{ gridTemplateColumns: "276px 1fr" }}
-                >
+                <div className="relative grid flex-1" style={{ gridTemplateColumns: "276px 1fr" }}>
                     <FileTreeSidebar
                         files={sortedFiles}
                         activePath={activePath}
                         onScrollTo={scrollToFile}
                     />
-                    <main ref={cardsRef} className="space-y-3 overflow-y-auto px-5 py-5">
+                    <main className="space-y-3 px-5 py-5">
                         {sortedFiles.map((f) => (
                             <FileCard
                                 key={f.path}
