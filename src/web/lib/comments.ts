@@ -68,22 +68,34 @@ export function buildPatchIndex(rawPatch: string): PatchLineIndex {
 export function markStaleComments(comments: CommentMap, files: ParsedFile[]): CommentMap {
     const byPath = new Map(files.map((f) => [f.path, f] as const));
     const next: CommentMap = {};
+    let changed = false;
     for (const [path, list] of Object.entries(comments)) {
         const file = byPath.get(path);
         if (!file) {
-            next[path] = list.map((c) => (c.stale ? c : { ...c, stale: true }));
+            let listChanged = false;
+            const updated = list.map((c) => {
+                if (c.stale) return c;
+                listChanged = true;
+                return { ...c, stale: true };
+            });
+            if (listChanged) changed = true;
+            next[path] = listChanged ? updated : list;
             continue;
         }
         const idx = buildPatchIndex(file.rawPatch);
-        next[path] = list.map((c) => {
+        let listChanged = false;
+        const updated = list.map((c) => {
             const map = c.side === "additions" ? idx.additions : idx.deletions;
             const current = map.get(c.lineNumber);
             const stale = current === undefined || current !== c.lineText;
             if (stale === Boolean(c.stale)) return c;
+            listChanged = true;
             return { ...c, stale };
         });
+        if (listChanged) changed = true;
+        next[path] = listChanged ? updated : list;
     }
-    return next;
+    return changed ? next : comments;
 }
 
 export function allCommentIds(comments: CommentMap, includeStale = false): string[] {
