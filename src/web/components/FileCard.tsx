@@ -32,7 +32,7 @@ function GutterAddButton({ onClick }: { onClick: () => void }) {
                 boxShadow:
                     "0 0 0 1px color-mix(in oklab, var(--color-primary) 65%, transparent), 0 2px 6px -2px color-mix(in oklab, var(--color-primary) 50%, transparent), inset 0 1px 0 0 rgba(255,255,255,0.18)",
             }}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 inline-flex shrink-0 items-center justify-center rounded-md transition-[transform,background-color] duration-100 ease-out hover:scale-105 active:scale-95"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 relative z-5 inline-flex shrink-0 items-center justify-center rounded-md transition-[transform,background-color] duration-100 ease-out hover:scale-105 active:scale-95"
             title="Add comment to this line"
             aria-label="Add comment to this line"
         >
