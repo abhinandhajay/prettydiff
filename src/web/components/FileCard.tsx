@@ -295,7 +295,7 @@ export function FileCard({
                         </Button>
                     </div>
                 </div>
-                <CollapsibleContent>
+                <CollapsibleContent className="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden">
                     <div className="px-3 py-2 pl-4">
                         {file.skipped ? (
                             <div className="bg-muted/30 text-muted-foreground border-border/60 rounded-md border border-dashed px-3 py-8 text-center text-sm">
