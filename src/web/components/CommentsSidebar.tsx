@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
+    Check,
     ChevronDown,
     ChevronRight,
     Copy,
@@ -86,6 +87,29 @@ export function CommentsSidebar({
 
     const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const [flashId, setFlashId] = useState<string | null>(null);
+    const [justCopied, setJustCopied] = useState(false);
+    const copiedTimerRef = useRef<number | null>(null);
+
+    useEffect(
+        () => () => {
+            if (copiedTimerRef.current !== null) {
+                window.clearTimeout(copiedTimerRef.current);
+            }
+        },
+        [],
+    );
+
+    const handleCopy = () => {
+        onCopy();
+        setJustCopied(true);
+        if (copiedTimerRef.current !== null) {
+            window.clearTimeout(copiedTimerRef.current);
+        }
+        copiedTimerRef.current = window.setTimeout(() => {
+            setJustCopied(false);
+            copiedTimerRef.current = null;
+        }, 1500);
+    };
 
     useEffect(() => {
         if (!scrollToId) return;
@@ -175,12 +199,30 @@ export function CommentsSidebar({
                 </span>
                 <Button
                     size="sm"
-                    onClick={onCopy}
+                    onClick={handleCopy}
                     disabled={selectedCount === 0}
-                    className="gap-1.5"
+                    className={cn(
+                        "transition-colors",
+                        justCopied && "bg-emerald-500/90 text-white hover:bg-emerald-500/90",
+                    )}
                 >
-                    <Copy className="size-3.5" />
-                    Copy for agent
+                    <span className="grid">
+                        <span
+                            aria-hidden
+                            className="invisible col-start-1 row-start-1 flex items-center justify-center gap-1.5"
+                        >
+                            <Copy className="size-3.5" />
+                            Copy for agent
+                        </span>
+                        <span className="col-start-1 row-start-1 flex items-center justify-center gap-1.5">
+                            {justCopied ? (
+                                <Check className="size-3.5" />
+                            ) : (
+                                <Copy className="size-3.5" />
+                            )}
+                            {justCopied ? "Copied" : "Copy for agent"}
+                        </span>
+                    </span>
                 </Button>
             </div>
         </aside>
