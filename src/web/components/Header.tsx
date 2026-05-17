@@ -1,7 +1,16 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
+import { repoBasename } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { GitBranch, ChevronsDownUp, ChevronsUpDown, RefreshCw, WrapText } from "lucide-react";
+import {
+    ChevronsDownUp,
+    ChevronsUpDown,
+    GitBranch,
+    MessageSquare,
+    RefreshCw,
+    WrapText,
+} from "lucide-react";
 import { useMemo } from "react";
 
 import type { DiffPayload } from "@/lib/types";
@@ -16,11 +25,9 @@ interface Props {
     onCollapseAll: () => void;
     onReload: () => void;
     isReloading: boolean;
-}
-
-function repoBasename(repoRoot: string): string {
-    const parts = repoRoot.replace(/\\/g, "/").split("/").filter(Boolean);
-    return parts[parts.length - 1] ?? repoRoot;
+    showComments: boolean;
+    onShowCommentsChange: (v: boolean) => void;
+    commentCount: number;
 }
 
 function LogoMark({ className }: { className?: string }) {
@@ -78,6 +85,9 @@ export function Header({
     onCollapseAll,
     onReload,
     isReloading,
+    showComments,
+    onShowCommentsChange,
+    commentCount,
 }: Props) {
     const totals = useMemo(
         () =>
@@ -93,7 +103,7 @@ export function Header({
     );
 
     return (
-        <header className="bg-background/70 supports-[backdrop-filter]:bg-background/55 relative sticky top-0 isolate z-20 flex h-14 items-center justify-between gap-4 border-b px-4 backdrop-blur-xl">
+        <header className="bg-background/70 supports-[backdrop-filter]:bg-background/55 isolate z-20 flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4 backdrop-blur-xl">
             <div className="flex min-w-0 items-center gap-3">
                 <div className="flex items-center gap-2">
                     <span className="text-primary bg-primary/10 ring-primary/25 inline-flex size-7 items-center justify-center rounded-md ring-1">
@@ -188,6 +198,29 @@ export function Header({
                     </Button>
                 </div>
                 <ViewToggle value={viewMode} onChange={onViewModeChange} />
+                <Divider />
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onShowCommentsChange(!showComments)}
+                    aria-pressed={showComments}
+                    title={showComments ? "Hide comments sidebar" : "Show comments sidebar"}
+                    className={cn(
+                        "relative text-muted-foreground hover:text-foreground",
+                        showComments && "text-foreground bg-muted/60",
+                    )}
+                >
+                    <MessageSquare />
+                    <span className="ml-1.5 hidden sm:inline">Comments</span>
+                    {commentCount > 0 ? (
+                        <Badge
+                            variant="secondary"
+                            className="pointer-events-none absolute -top-1 -right-1 h-4 min-w-4 rounded-full px-1 font-mono text-[9px] tabular-nums"
+                        >
+                            {commentCount}
+                        </Badge>
+                    ) : null}
+                </Button>
             </div>
         </header>
     );
