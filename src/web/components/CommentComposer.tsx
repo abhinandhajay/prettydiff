@@ -19,8 +19,8 @@ export function CommentComposer({ onSave, onCancel }: Props) {
     const canSave = trimmed.length > 0;
 
     return (
-        <div className="bg-card border-primary/25 ring-primary/15 mx-3 my-2 overflow-hidden rounded-lg border shadow-md ring-1">
-            <div className="from-primary/10 to-primary/3 border-primary/20 flex items-center justify-between gap-2 border-b bg-linear-to-b px-3 py-1.5">
+        <div className="bg-card border-primary/25 mx-3 my-2 overflow-hidden rounded-lg border">
+            <div className="bg-muted/40 border-primary/20 flex items-center justify-between gap-2 border-b px-3 py-1.5">
                 <div className="flex items-center gap-1.5">
                     <span className="text-primary text-[11px] leading-none">◆</span>
                     <span className="text-foreground/85 text-[11px] font-medium tracking-[0.14em] uppercase">

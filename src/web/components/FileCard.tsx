@@ -236,7 +236,7 @@ export function FileCard({
                 className={cn("absolute inset-y-0 left-0 w-0.5", STATUS_STRIPE[file.status])}
             />
             <Collapsible open={open} onOpenChange={onOpenChange}>
-                <div className="bg-card/90 border-border/60 sticky top-0 z-10 flex items-center justify-between gap-3 border-b px-3 py-2 pl-4 backdrop-blur">
+                <div className="bg-muted/60 border-border/60 sticky top-0 z-10 flex items-center justify-between gap-3 border-b px-3 py-2 pl-4 backdrop-blur">
                     <CollapsibleTrigger asChild>
                         <button className="flex min-w-0 flex-1 items-center gap-2 text-left">
                             {open ? (
@@ -304,7 +304,7 @@ export function FileCard({
                                     : "File too large — preview skipped."}
                             </div>
                         ) : (
-                            <div className="border-border/60 bg-background/40 overflow-x-auto rounded-md border">
+                            <div className="bg-background/40 overflow-x-auto">
                                 <PatchDiff<AnnotationMeta>
                                     patch={file.rawPatch}
                                     options={diffOptions}

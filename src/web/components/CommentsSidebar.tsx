@@ -315,8 +315,8 @@ function CommentRow({
         >
             <div
                 className={cn(
-                    "from-primary/8 to-primary/2 border-border/50 flex items-center justify-between gap-1.5 border-b bg-linear-to-b px-2.5 py-1",
-                    checked && !comment.stale && "from-primary/12 to-primary/3 border-primary/25",
+                    "bg-muted/40 border-border/50 flex items-center justify-between gap-1.5 border-b px-2.5 py-1",
+                    checked && !comment.stale && "border-primary/25",
                 )}
             >
                 <div className="flex min-w-0 items-center gap-1.5 text-[11px]">
@@ -374,7 +374,7 @@ function CommentRow({
                 )}
             </div>
             {!editing ? (
-                <div className="from-primary/3 to-primary/0 border-border/50 flex items-center justify-between gap-2 border-t bg-linear-to-b px-2.5 py-1">
+                <div className="bg-muted/40 border-border/50 flex items-center justify-between gap-2 border-t px-2.5 py-1">
                     <div className="flex items-center gap-2">
                         <span className="text-muted-foreground/70 font-mono text-[10.5px] tabular-nums">
                             {formatRelativeTime(comment.createdAt)}
