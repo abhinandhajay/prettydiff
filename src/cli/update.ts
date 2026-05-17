@@ -7,7 +7,7 @@ const TIMEOUT_MS = 1500;
 export type Installer = "bun" | "pnpm" | "yarn" | "npm";
 
 export async function checkForUpdate(currentVersion: string): Promise<string | null> {
-    if (process.env.PRETTYDIFF_NO_UPDATE_CHECK) return null;
+    if (isEnvTrue(process.env.PRETTYDIFF_NO_UPDATE_CHECK)) return null;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -72,6 +72,12 @@ export function isNewer(latest: string, current: string): boolean {
         if (a[i] < b[i]) return false;
     }
     return false;
+}
+
+function isEnvTrue(value: string | undefined): boolean {
+    if (!value) return false;
+    const v = value.trim().toLowerCase();
+    return v !== "" && v !== "0" && v !== "false" && v !== "no" && v !== "off";
 }
 
 function parseVersion(v: string): [number, number, number] | null {

@@ -249,9 +249,12 @@ describe("checkForUpdate", () => {
         expect(seenUrl).toBe("https://registry.npmjs.org/%40abhinandhajay%2Fprettydiff/latest");
     });
 
-    test("env var set to empty string → check still runs (truthiness)", async () => {
-        process.env.PRETTYDIFF_NO_UPDATE_CHECK = "";
-        globalThis.fetch = makeFetchStub(async () => jsonResponse({ version: "9.9.9" }));
-        expect(await checkForUpdate("0.1.0")).toBe("9.9.9");
-    });
+    test.each(["", "0", "false", "no", "off", "FALSE", " 0 "])(
+        "env var set to falsy value %p → check still runs",
+        async (value) => {
+            process.env.PRETTYDIFF_NO_UPDATE_CHECK = value;
+            globalThis.fetch = makeFetchStub(async () => jsonResponse({ version: "9.9.9" }));
+            expect(await checkForUpdate("0.1.0")).toBe("9.9.9");
+        },
+    );
 });
