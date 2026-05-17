@@ -136,7 +136,7 @@ export function CommentsSidebar({
                     </p>
                 </div>
             ) : (
-                <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]>div]:block!">
+                <ScrollArea className="min-h-0 flex-1 [&>[data-radix-scroll-area-viewport]>div]:block!">
                     <div className="px-2 py-2">
                         {groups.map((g) => (
                             <FileGroupBlock
