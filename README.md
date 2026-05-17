@@ -1,17 +1,25 @@
 # prettydiff
 
+[![npm version](https://img.shields.io/npm/v/@abhinandhajay/prettydiff)](https://www.npmjs.com/package/@abhinandhajay/prettydiff)
+[![license](https://img.shields.io/github/license/abhinandhajay/prettydiff)](LICENSE)
+
 A refined local web viewer for your Git working tree changes. Run `prettydiff` inside any Git repository and a browser tab opens with a side-by-side or unified diff of every modified, added, deleted, renamed, and untracked file.
+
+![prettydiff screenshot](https://utfs.io/f/1Dz4wc6RUalTe5pGJrWwg7NTJVO6bYFZ5mx9d2sPEQcXKu0I)
 
 ## Features
 
 - Side-by-side and unified diff views
 - File-tree sidebar with status indicators and addition/deletion counts
+- Inline comments on diff lines with edit/delete controls
+- Comments sidebar with jump-to-line navigation and AI-ready copy
 - Collapsible per-file cards
 - Detects modified, added, deleted, renamed, and untracked files
 - Zero config — runs in any Git repo
-- Refined dev-tool aesthetic
 
 ## Installation
+
+Requirements: Node `>=18.17` and Git.
 
 ```sh
 npm install -g @abhinandhajay/prettydiff
