@@ -16,7 +16,7 @@
         "isolatedModules": true,
         "verbatimModuleSyntax": false,
         "useDefineForClassFields": true,
-        "types": ["node"],
+        "types": ["node", "bun"],
         "paths": {
             "@/*": ["./src/web/*"]
         }
