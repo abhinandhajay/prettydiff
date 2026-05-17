@@ -1,6 +1,6 @@
 {
     "name": "@abhinandhajay/prettydiff",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Open the working-tree diff of any git repo in a local web viewer.",
     "keywords": [
         "cli",
@@ -23,7 +23,8 @@
     },
     "files": [
         "dist/cli",
-        "dist/web"
+        "dist/web",
+        "CHANGELOG.md"
     ],
     "type": "module",
     "publishConfig": {
