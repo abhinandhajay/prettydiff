@@ -51,6 +51,9 @@ export async function startServer(repoRoot: string, port: number): Promise<Start
                     close: () =>
                         new Promise<void>((res) => {
                             server.close(() => res());
+                            if ("closeAllConnections" in server) {
+                                server.closeAllConnections();
+                            }
                         }),
                 });
             },

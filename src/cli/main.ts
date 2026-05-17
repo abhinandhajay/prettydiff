@@ -4,6 +4,7 @@ import open from "open";
 import { getRepoRoot } from "./git.js";
 import { findPort } from "./port.js";
 import { startServer } from "./server.js";
+import { checkForUpdate, detectInstaller, formatUpdateNotice } from "./update.js";
 
 const HELP = `prettydiff — open the working-tree diff of any git repo in a local web viewer
 
@@ -54,8 +55,9 @@ export async function main(argv: string[]): Promise<number> {
         process.stdout.write(HELP);
         return 0;
     }
+    const version = await readVersion();
     if (args.version) {
-        process.stdout.write((await readVersion()) + "\n");
+        process.stdout.write(version + "\n");
         return 0;
     }
 
@@ -75,6 +77,15 @@ export async function main(argv: string[]): Promise<number> {
             // ignore — the URL is printed above
         });
     }
+
+    checkForUpdate(version)
+        .then((latest) => {
+            if (!latest) return;
+            process.stdout.write(formatUpdateNotice(version, latest, detectInstaller()));
+        })
+        .catch(() => {
+            // ignore — update check is best-effort
+        });
 
     await new Promise<void>((resolve) => {
         let shuttingDown = false;
