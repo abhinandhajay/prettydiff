@@ -1,3 +1,5 @@
+import { repoBasename } from "@/lib/format";
+
 import type { CommentMap, CommentSide, DiffComment, DiffPayload, ParsedFile } from "@/lib/types";
 
 export interface CommentLocation {
@@ -21,12 +23,12 @@ export function commentsByKey(comments: DiffComment[]): Map<string, DiffComment[
     return map;
 }
 
-interface PatchLineIndex {
+export interface PatchLineIndex {
     additions: Map<number, string>;
     deletions: Map<number, string>;
 }
 
-function indexPatchLines(rawPatch: string): PatchLineIndex {
+export function buildPatchIndex(rawPatch: string): PatchLineIndex {
     const additions = new Map<number, string>();
     const deletions = new Map<number, string>();
     let addLine = 0;
@@ -63,16 +65,6 @@ function indexPatchLines(rawPatch: string): PatchLineIndex {
     return { additions, deletions };
 }
 
-export function lookupLineText(
-    file: ParsedFile,
-    side: CommentSide,
-    lineNumber: number,
-): string | undefined {
-    const idx = indexPatchLines(file.rawPatch);
-    const map = side === "additions" ? idx.additions : idx.deletions;
-    return map.get(lineNumber);
-}
-
 export function markStaleComments(comments: CommentMap, files: ParsedFile[]): CommentMap {
     const byPath = new Map(files.map((f) => [f.path, f] as const));
     const next: CommentMap = {};
@@ -82,7 +74,7 @@ export function markStaleComments(comments: CommentMap, files: ParsedFile[]): Co
             next[path] = list.map((c) => (c.stale ? c : { ...c, stale: true }));
             continue;
         }
-        const idx = indexPatchLines(file.rawPatch);
+        const idx = buildPatchIndex(file.rawPatch);
         next[path] = list.map((c) => {
             const map = c.side === "additions" ? idx.additions : idx.deletions;
             const current = map.get(c.lineNumber);
@@ -166,7 +158,7 @@ export function formatCommentsForCopy(
         if (items.length > 0) selectedByFile.push({ path, items });
     }
 
-    const repoName = payload.repoRoot.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+    const repoName = repoBasename(payload.repoRoot);
     const head = payload.head ? payload.head.slice(0, 7) : "";
 
     const lines: string[] = [

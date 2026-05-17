@@ -3,21 +3,34 @@ import { CommentIndicator } from "@/components/CommentIndicator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { commentKey, commentsByKey, lookupLineText } from "@/lib/comments";
+import { buildPatchIndex, commentKey, commentsByKey } from "@/lib/comments";
 import { fileCardId } from "@/lib/slug";
 import { cn } from "@/lib/utils";
 import { PatchDiff } from "@pierre/diffs/react";
 import {
+    ArrowRight,
     ChevronDown,
     ChevronRight,
     Copy,
-    FilePlus,
+    FileBox,
     FileMinus,
     FilePen,
-    FileBox,
-    ArrowRight,
+    FilePlus,
     Plus,
 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+
+import type { ViewMode } from "@/components/ViewToggle";
+import type { PatchLineIndex } from "@/lib/comments";
+import type {
+    CommentLineType,
+    CommentSide,
+    DiffComment,
+    DraftLine,
+    FileStatus,
+    ParsedFile,
+} from "@/lib/types";
+import type { DiffLineAnnotation } from "@pierre/diffs";
 
 function GutterAddButton({ onClick }: { onClick: () => void }) {
     return (
@@ -40,18 +53,6 @@ function GutterAddButton({ onClick }: { onClick: () => void }) {
         </button>
     );
 }
-import { useCallback, useMemo, useState } from "react";
-
-import type { ViewMode } from "@/components/ViewToggle";
-import type {
-    CommentLineType,
-    CommentSide,
-    DiffComment,
-    DraftLine,
-    FileStatus,
-    ParsedFile,
-} from "@/lib/types";
-import type { DiffLineAnnotation } from "@pierre/diffs";
 
 type AnnotationMeta = { kind: "draft" } | { kind: "existing"; comment: DiffComment };
 
@@ -107,12 +108,12 @@ function splitPath(path: string): { dir: string; base: string } {
 }
 
 function deriveLineType(
-    file: ParsedFile,
+    index: PatchLineIndex,
     side: CommentSide,
     lineNumber: number,
 ): { lineType: CommentLineType; lineText: string } | null {
-    const additionText = lookupLineText(file, "additions", lineNumber);
-    const deletionText = lookupLineText(file, "deletions", lineNumber);
+    const additionText = index.additions.get(lineNumber);
+    const deletionText = index.deletions.get(lineNumber);
     if (side === "additions") {
         if (additionText === undefined) return null;
         if (deletionText !== undefined && deletionText === additionText) {
@@ -145,6 +146,8 @@ export function FileCard({
 }: Props) {
     const { dir, base } = splitPath(file.path);
 
+    const patchIndex = useMemo(() => buildPatchIndex(file.rawPatch), [file.rawPatch]);
+
     const lineAnnotations = useMemo<DiffLineAnnotation<AnnotationMeta>[]>(() => {
         const grouped = commentsByKey(comments.filter((c) => !c.stale));
         const annotations: DiffLineAnnotation<AnnotationMeta>[] = [];
@@ -159,12 +162,7 @@ export function FileCard({
         }
 
         if (activeDraft && activeDraft.filePath === file.path) {
-            const draftKey = commentKey({
-                filePath: activeDraft.filePath,
-                side: activeDraft.side,
-                lineNumber: activeDraft.lineNumber,
-            });
-            if (!grouped.has(draftKey)) {
+            if (!grouped.has(commentKey(activeDraft))) {
                 annotations.push({
                     side: activeDraft.side,
                     lineNumber: activeDraft.lineNumber,
@@ -180,7 +178,7 @@ export function FileCard({
         (getHover: () => { lineNumber: number; side: CommentSide } | undefined) => {
             const hover = getHover();
             if (!hover) return;
-            const derived = deriveLineType(file, hover.side, hover.lineNumber);
+            const derived = deriveLineType(patchIndex, hover.side, hover.lineNumber);
             if (!derived) return;
             onRequestDraft({
                 filePath: file.path,
@@ -190,7 +188,7 @@ export function FileCard({
                 lineText: derived.lineText,
             });
         },
-        [file, onRequestDraft],
+        [file.path, patchIndex, onRequestDraft],
     );
 
     const [hoveredLine, setHoveredLine] = useState<{

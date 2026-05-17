@@ -1,3 +1,7 @@
+export function repoBasename(repoRoot: string): string {
+    return repoRoot.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+}
+
 export function formatRelativeTime(timestamp: number, now: number = Date.now()): string {
     const diff = Math.max(0, now - timestamp);
     const sec = Math.floor(diff / 1000);

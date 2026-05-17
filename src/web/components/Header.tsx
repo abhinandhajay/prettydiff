@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
+import { repoBasename } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
     ChevronsDownUp,
@@ -27,11 +28,6 @@ interface Props {
     showComments: boolean;
     onShowCommentsChange: (v: boolean) => void;
     commentCount: number;
-}
-
-function repoBasename(repoRoot: string): string {
-    const parts = repoRoot.replace(/\\/g, "/").split("/").filter(Boolean);
-    return parts[parts.length - 1] ?? repoRoot;
 }
 
 function LogoMark({ className }: { className?: string }) {

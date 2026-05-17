@@ -19,10 +19,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { CommentMap, DiffComment } from "@/lib/types";
+import type { CommentLineType, CommentMap, DiffComment } from "@/lib/types";
 
 interface Props {
     comments: CommentMap;
+    totalCount: number;
     selectedIds: Set<string>;
     onToggleSelected: (id: string) => void;
     onToggleFile: (filePath: string, select: boolean) => void;
@@ -39,7 +40,6 @@ interface FileGroup {
     path: string;
     comments: DiffComment[];
     active: DiffComment[];
-    stale: DiffComment[];
 }
 
 function groupByFile(comments: CommentMap): FileGroup[] {
@@ -50,15 +50,31 @@ function groupByFile(comments: CommentMap): FileGroup[] {
                 path,
                 comments: sorted,
                 active: sorted.filter((c) => !c.stale),
-                stale: sorted.filter((c) => Boolean(c.stale)),
             };
         })
         .filter((g) => g.comments.length > 0)
         .sort((a, b) => a.path.localeCompare(b.path));
 }
 
+const SIDE_MARK: Record<CommentLineType, string> = {
+    "change-addition": "+",
+    "change-deletion": "−",
+    context: " ",
+    "context-expanded": " ",
+};
+
+function fileHeaderCheckState(
+    activeCount: number,
+    selectedInGroup: number,
+): boolean | "indeterminate" {
+    if (activeCount === 0 || selectedInGroup === 0) return false;
+    if (selectedInGroup === activeCount) return true;
+    return "indeterminate";
+}
+
 export function CommentsSidebar({
     comments,
+    totalCount,
     selectedIds,
     onToggleSelected,
     onToggleFile,
@@ -71,10 +87,6 @@ export function CommentsSidebar({
     open,
 }: Props) {
     const groups = useMemo(() => groupByFile(comments), [comments]);
-    const totalCount = useMemo(
-        () => Object.values(comments).reduce((n, list) => n + list.length, 0),
-        [comments],
-    );
     const selectedCount = useMemo(() => {
         let n = 0;
         for (const list of Object.values(comments)) {
@@ -255,14 +267,7 @@ function FileGroupBlock({
     const [open, setOpen] = useState(true);
     const active = group.active;
     const selectedInGroup = active.filter((c) => selectedIds.has(c.id)).length;
-    const headerCheckState: boolean | "indeterminate" =
-        active.length === 0
-            ? false
-            : selectedInGroup === 0
-              ? false
-              : selectedInGroup === active.length
-                ? true
-                : "indeterminate";
+    const headerCheckState = fileHeaderCheckState(active.length, selectedInGroup);
 
     return (
         <Collapsible open={open} onOpenChange={setOpen} className="mb-1.5">
@@ -336,13 +341,7 @@ function CommentRow({
     register,
 }: CommentRowProps) {
     const [editing, setEditing] = useState(false);
-
-    const sideMark =
-        comment.lineType === "change-addition"
-            ? "+"
-            : comment.lineType === "change-deletion"
-              ? "−"
-              : " ";
+    const sideMark = SIDE_MARK[comment.lineType];
 
     return (
         <div
