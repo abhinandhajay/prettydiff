@@ -23,16 +23,12 @@ Requirements: Node `>=18.17` and Git.
 
 ```sh
 npm install -g @abhinandhajay/prettydiff
-# or
-bun add -g @abhinandhajay/prettydiff
 ```
 
-Local install from a clone:
+or with Bun:
 
 ```sh
-bun install
-bun run build
-npm link
+bun add -g @abhinandhajay/prettydiff
 ```
 
 ## Usage
@@ -54,6 +50,8 @@ Options:
 
 `Ctrl-C` shuts down the server.
 
+prettydiff prints a one-line update notice on startup when a newer version is on npm. Set `PRETTYDIFF_NO_UPDATE_CHECK=1` to disable.
+
 ## Development
 
 Prerequisites: [Bun](https://bun.sh), Node `>=18.17`, Git.
@@ -70,47 +68,26 @@ Run the web viewer in isolation against the sample fixture (Vite, port 5173, ser
 bun run dev
 ```
 
-Build everything and run the CLI locally against a real repo:
+To try the dev build against a real repo, run `bun run build`, then from inside that repo run `node /path/to/prettydiff/dist/cli/bin.js`. This leaves any globally-installed `prettydiff` untouched.
 
-```sh
-bun run build
-cd /path/to/some/git/repo
-node /path/to/prettydiff/dist/cli/bin.js
-```
+Alternatively, run `bun link` once to put the dev build on your PATH as `prettydiff` — convenient for full-time development, but it shadows any globally-installed version until you `bun unlink @abhinandhajay/prettydiff`.
 
 ### Scripts
 
-| Script                 | Purpose                                                     |
-| ---------------------- | ----------------------------------------------------------- |
-| `bun run dev`          | Vite dev server for the web viewer with sample fixture      |
-| `bun run build`        | Full build: web bundle + CLI compilation                    |
-| `bun run build:web`    | Bundle the web viewer to `dist/web/`                        |
-| `bun run build:cli`    | Compile the CLI to `dist/cli/` and mark `bin.js` executable |
-| `bun run start`        | Run the compiled CLI (`node dist/cli/bin.js`)               |
-| `bun run lint`         | Run Oxlint                                                  |
-| `bun run lint:fix`     | Run Oxlint with `--fix`                                     |
-| `bun run format`       | Format all code with Oxfmt                                  |
-| `bun run format:check` | Verify formatting without writing                           |
+| Script           | Purpose                                                |
+| ---------------- | ------------------------------------------------------ |
+| `bun run dev`    | Vite dev server for the web viewer with sample fixture |
+| `bun run build`  | Full build: web bundle + CLI compilation               |
+| `bun run start`  | Run the compiled CLI (`node dist/cli/bin.js`)          |
+| `bun test`       | Run the test suite                                     |
+| `bun run lint`   | Run Oxlint                                             |
+| `bun run format` | Format all code with Oxfmt                             |
 
 ## Project structure
 
-```
-src/
-├── cli/                  Node-side CLI
-│   ├── bin.ts            Executable entry point
-│   ├── main.ts           Arg parsing, orchestration, lifecycle
-│   ├── git.ts            Git operations (diff, ls-files, metadata)
-│   ├── server.ts         Hono server (serves /api/diff + static viewer)
-│   ├── port.ts           Port discovery in 39400-39499
-│   └── types.ts          Shared types
-└── web/                  React + Vite viewer
-    ├── App.tsx           Root component
-    ├── main.tsx          React entry
-    ├── components/       UI components (Header, FileCard, FileTreeSidebar, …)
-    ├── lib/              fetchDiff, types, treeSort, slug, hooks
-    └── styles/           Tailwind globals
-fixtures/sample-diff.json Dev-mode mock payload
-```
+- **`src/cli/`** — Node-side CLI: arg parsing, git ops, Hono server, port discovery, update check
+- **`src/web/`** — React + Vite viewer (components, lib, styles)
+- **`fixtures/sample-diff.json`** — Dev-mode mock payload served by Vite at `/api/diff`
 
 ## Tech stack
 
