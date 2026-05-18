@@ -191,17 +191,26 @@ export async function getDiffPayload(cwd: string): Promise<DiffPayload | null> {
     const files: ParsedFile[] = [];
     for (const block of fileBlocks) {
         const parsedArr = parseDiffLib(block);
+        const isBinary = /^Binary files .* differ$/m.test(block);
         for (const p of parsedArr) {
             const { path: filePath, oldPath } = normalizePath(p);
             const isUntracked = untrackedPaths.has(filePath);
             const status = inferStatus(p, isUntracked);
+            const hasHunks = (p.chunks?.length ?? 0) > 0;
+            const skipped: ParsedFile["skipped"] = isBinary
+                ? { reason: "binary" }
+                : !hasHunks
+                  ? { reason: "no-hunks" }
+                  : undefined;
             files.push({
                 path: filePath,
                 oldPath,
                 status,
                 additions: p.additions ?? 0,
                 deletions: p.deletions ?? 0,
-                rawPatch: block,
+                rawPatch: skipped ? "" : block,
+                ...(isBinary ? { binary: true } : {}),
+                ...(skipped ? { skipped } : {}),
             });
         }
     }
