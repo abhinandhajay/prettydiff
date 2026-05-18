@@ -81,7 +81,24 @@
             "status": "renamed",
             "additions": 0,
             "deletions": 0,
-            "rawPatch": "diff --git a/assets/logo-v1.svg b/assets/logo.svg\nsimilarity index 100%\nrename from assets/logo-v1.svg\nrename to assets/logo.svg\n"
+            "rawPatch": "",
+            "skipped": { "reason": "no-hunks" }
+        },
+        {
+            "path": "scripts/deploy.sh",
+            "status": "modified",
+            "additions": 0,
+            "deletions": 0,
+            "rawPatch": "",
+            "skipped": { "reason": "no-hunks" }
+        },
+        {
+            "path": "vendor/some-submodule",
+            "status": "modified",
+            "additions": 0,
+            "deletions": 0,
+            "rawPatch": "",
+            "skipped": { "reason": "no-hunks" }
         },
         {
             "path": "notes.todo",
