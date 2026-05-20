@@ -1,11 +1,12 @@
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentIndicator } from "@/components/CommentIndicator";
+import { LazyDiffBody } from "@/components/LazyDiffBody";
 import { PatchErrorBoundary } from "@/components/PatchErrorBoundary";
 import { SkippedPreview } from "@/components/SkippedPreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { buildPatchIndex, commentKey, commentsByKey } from "@/lib/comments";
+import { commentKey, commentsByKey } from "@/lib/comments";
 import { fileCardId } from "@/lib/slug";
 import { cn } from "@/lib/utils";
 import { PatchDiff } from "@pierre/diffs/react";
@@ -20,7 +21,7 @@ import {
     FilePlus,
     Plus,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
@@ -61,11 +62,13 @@ type AnnotationMeta = { kind: "draft" } | { kind: "existing"; comment: DiffComme
 interface Props {
     file: ParsedFile;
     open: boolean;
-    onOpenChange: (open: boolean) => void;
+    onOpenChange: (path: string, open: boolean) => void;
     viewMode: ViewMode;
     wrap: boolean;
     comments: DiffComment[];
+    patchIndex: PatchLineIndex;
     activeDraft: DraftLine | null;
+    forceMountBody?: boolean;
     onRequestDraft: (draft: DraftLine) => void;
     onCancelDraft: () => void;
     onSaveDraft: (body: string) => void;
@@ -130,14 +133,16 @@ function deriveLineType(
     return { lineType: "change-deletion", lineText: deletionText };
 }
 
-export function FileCard({
+function FileCardImpl({
     file,
     open,
     onOpenChange,
     viewMode,
     wrap,
     comments,
+    patchIndex,
     activeDraft,
+    forceMountBody,
     onRequestDraft,
     onCancelDraft,
     onSaveDraft,
@@ -147,8 +152,12 @@ export function FileCard({
     flashCommentId,
 }: Props) {
     const { dir, base } = splitPath(file.path);
+    const draftForFile = activeDraft && activeDraft.filePath === file.path ? activeDraft : null;
 
-    const patchIndex = useMemo(() => buildPatchIndex(file.rawPatch), [file.rawPatch]);
+    const handleOpenChange = useCallback(
+        (next: boolean) => onOpenChange(file.path, next),
+        [file.path, onOpenChange],
+    );
 
     const lineAnnotations = useMemo<DiffLineAnnotation<AnnotationMeta>[]>(() => {
         const grouped = commentsByKey(comments.filter((c) => !c.stale));
@@ -163,18 +172,18 @@ export function FileCard({
             });
         }
 
-        if (activeDraft && activeDraft.filePath === file.path) {
-            if (!grouped.has(commentKey(activeDraft))) {
+        if (draftForFile) {
+            if (!grouped.has(commentKey(draftForFile))) {
                 annotations.push({
-                    side: activeDraft.side,
-                    lineNumber: activeDraft.lineNumber,
+                    side: draftForFile.side,
+                    lineNumber: draftForFile.lineNumber,
                     metadata: { kind: "draft" },
                 });
             }
         }
 
         return annotations;
-    }, [comments, activeDraft, file.path]);
+    }, [comments, draftForFile]);
 
     const handleGutterClick = useCallback(
         (getHover: () => { lineNumber: number; side: CommentSide } | undefined) => {
@@ -235,7 +244,7 @@ export function FileCard({
                 aria-hidden
                 className={cn("absolute inset-y-0 left-0 w-0.5", STATUS_STRIPE[file.status])}
             />
-            <Collapsible open={open} onOpenChange={onOpenChange}>
+            <Collapsible open={open} onOpenChange={handleOpenChange}>
                 <div className="bg-muted/60 border-border/60 sticky top-0 z-10 flex items-center justify-between gap-3 border-b px-3 py-2 pl-4 backdrop-blur">
                     <CollapsibleTrigger asChild>
                         <button className="flex min-w-0 flex-1 items-center gap-2 text-left">
@@ -304,39 +313,49 @@ export function FileCard({
                                 key={file.path}
                                 fallback={<SkippedPreview reason="render-error" />}
                             >
-                                <div className="bg-background/40 overflow-x-auto">
-                                    <PatchDiff<AnnotationMeta>
-                                        patch={file.rawPatch}
-                                        options={diffOptions}
-                                        lineAnnotations={lineAnnotations}
-                                        renderAnnotation={(a) => {
-                                            if (a.metadata.kind === "draft") {
+                                <LazyDiffBody
+                                    estimatedHeight={Math.min(
+                                        2400,
+                                        56 + (file.additions + file.deletions) * 18,
+                                    )}
+                                    forceMount={forceMountBody}
+                                >
+                                    <div className="bg-background/40 overflow-x-auto">
+                                        <PatchDiff<AnnotationMeta>
+                                            patch={file.rawPatch}
+                                            options={diffOptions}
+                                            lineAnnotations={lineAnnotations}
+                                            renderAnnotation={(a) => {
+                                                if (a.metadata.kind === "draft") {
+                                                    return (
+                                                        <CommentComposer
+                                                            onSave={onSaveDraft}
+                                                            onCancel={onCancelDraft}
+                                                        />
+                                                    );
+                                                }
                                                 return (
-                                                    <CommentComposer
-                                                        onSave={onSaveDraft}
-                                                        onCancel={onCancelDraft}
+                                                    <CommentIndicator
+                                                        comment={a.metadata.comment}
+                                                        onEdit={onEditComment}
+                                                        onDelete={onDeleteComment}
+                                                        onFocusInSidebar={onFocusComment}
+                                                        flash={
+                                                            flashCommentId === a.metadata.comment.id
+                                                        }
                                                     />
                                                 );
+                                            }}
+                                            renderGutterUtility={(getHover) =>
+                                                hoverOccupied ? null : (
+                                                    <GutterAddButton
+                                                        onClick={() => handleGutterClick(getHover)}
+                                                    />
+                                                )
                                             }
-                                            return (
-                                                <CommentIndicator
-                                                    comment={a.metadata.comment}
-                                                    onEdit={onEditComment}
-                                                    onDelete={onDeleteComment}
-                                                    onFocusInSidebar={onFocusComment}
-                                                    flash={flashCommentId === a.metadata.comment.id}
-                                                />
-                                            );
-                                        }}
-                                        renderGutterUtility={(getHover) =>
-                                            hoverOccupied ? null : (
-                                                <GutterAddButton
-                                                    onClick={() => handleGutterClick(getHover)}
-                                                />
-                                            )
-                                        }
-                                    />
-                                </div>
+                                        />
+                                    </div>
+                                </LazyDiffBody>
                             </PatchErrorBoundary>
                         )}
                     </div>
@@ -345,3 +364,5 @@ export function FileCard({
         </div>
     );
 }
+
+export const FileCard = memo(FileCardImpl);

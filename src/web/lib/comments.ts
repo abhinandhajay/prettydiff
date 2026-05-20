@@ -65,7 +65,11 @@ export function buildPatchIndex(rawPatch: string): PatchLineIndex {
     return { additions, deletions };
 }
 
-export function markStaleComments(comments: CommentMap, files: ParsedFile[]): CommentMap {
+export function markStaleComments(
+    comments: CommentMap,
+    files: ParsedFile[],
+    indexByPath?: Map<string, PatchLineIndex>,
+): CommentMap {
     const byPath = new Map(files.map((f) => [f.path, f] as const));
     const next: CommentMap = {};
     let changed = false;
@@ -82,7 +86,7 @@ export function markStaleComments(comments: CommentMap, files: ParsedFile[]): Co
             next[path] = listChanged ? updated : list;
             continue;
         }
-        const idx = buildPatchIndex(file.rawPatch);
+        const idx = indexByPath?.get(path) ?? buildPatchIndex(file.rawPatch);
         let listChanged = false;
         const updated = list.map((c) => {
             const map = c.side === "additions" ? idx.additions : idx.deletions;

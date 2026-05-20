@@ -6,6 +6,7 @@ import { FileTreeSidebar } from "@/components/FileTreeSidebar";
 import { Header } from "@/components/Header";
 import {
     allCommentIds,
+    buildPatchIndex,
     commentKey,
     formatCommentsForCopy,
     markStaleComments,
@@ -17,16 +18,25 @@ import { usePersistedState } from "@/lib/usePersistedState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ViewMode } from "@/components/ViewToggle";
+import type { PatchLineIndex } from "@/lib/comments";
 import type { CommentMap, DiffComment, DiffPayload, DraftLine } from "@/lib/types";
+
+const EMPTY_COMMENTS: DiffComment[] = [];
+const EMPTY_PATCH_INDEX: PatchLineIndex = { additions: new Map(), deletions: new Map() };
 
 export default function App() {
     const [payload, setPayload] = useState<DiffPayload | null>(null);
+    const [patchIndexByPath, setPatchIndexByPath] = useState<Map<string, PatchLineIndex>>(
+        () => new Map(),
+    );
     const [error, setError] = useState<string | null>(null);
     const [isReloading, setIsReloading] = useState(false);
     const [viewMode, setViewMode] = usePersistedState<ViewMode>("prettydiff:view", "unified");
     const [wrap, setWrap] = usePersistedState<boolean>("prettydiff:wrap", false);
     const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
     const [activePath, setActivePath] = useState<string | null>(null);
+
+    const [forceMountPath, setForceMountPath] = useState<string | null>(null);
 
     const [comments, setComments] = usePersistedState<CommentMap>("prettydiff:comments", {});
     const [showCommentsSidebar, setShowCommentsSidebar] = usePersistedState<boolean>(
@@ -51,7 +61,10 @@ export default function App() {
             fetchDiff()
                 .then((p) => {
                     setPayload(p);
-                    const stamped = markStaleComments(commentsRef.current, p.files);
+                    const indexByPath = new Map<string, PatchLineIndex>();
+                    for (const f of p.files) indexByPath.set(f.path, buildPatchIndex(f.rawPatch));
+                    setPatchIndexByPath(indexByPath);
+                    const stamped = markStaleComments(commentsRef.current, p.files, indexByPath);
                     if (stamped !== commentsRef.current) {
                         setComments(stamped);
                     }
@@ -135,34 +148,42 @@ export default function App() {
         if (!main) return;
         const cards = Array.from(main.querySelectorAll<HTMLElement>("[data-file-path]"));
         if (cards.length === 0) return;
-        let raf = 0;
-        const STICKY_OFFSET = main.getBoundingClientRect().top;
-        const compute = () => {
-            raf = 0;
-            let active: string | null = cards[0]?.dataset.filePath ?? null;
-            for (const card of cards) {
-                if (card.getBoundingClientRect().top - STICKY_OFFSET <= 1) {
-                    active = card.dataset.filePath ?? active;
-                } else {
-                    break;
+
+        const visible = new Map<string, DOMRectReadOnly>();
+        const recompute = () => {
+            if (visible.size === 0) return;
+            let topPath: string | null = null;
+            let topY = Infinity;
+            for (const [path, rect] of visible) {
+                if (rect.top < topY) {
+                    topY = rect.top;
+                    topPath = path;
                 }
             }
-            if (active) setActivePath(active);
+            if (topPath) setActivePath(topPath);
         };
-        const schedule = () => {
-            if (raf) return;
-            raf = window.requestAnimationFrame(compute);
-        };
-        schedule();
-        main.addEventListener("scroll", schedule, { passive: true });
-        const ro = new ResizeObserver(schedule);
-        cards.forEach((c) => ro.observe(c));
-        return () => {
-            main.removeEventListener("scroll", schedule);
-            ro.disconnect();
-            if (raf) window.cancelAnimationFrame(raf);
-        };
+
+        const io = new IntersectionObserver(
+            (entries) => {
+                for (const e of entries) {
+                    const path = (e.target as HTMLElement).dataset.filePath;
+                    if (!path) continue;
+                    if (e.isIntersecting) visible.set(path, e.boundingClientRect);
+                    else visible.delete(path);
+                }
+                recompute();
+            },
+            { root: main, rootMargin: "0px 0px -85% 0px", threshold: [0, 1] },
+        );
+        cards.forEach((c) => io.observe(c));
+        return () => io.disconnect();
     }, [payload]);
+
+    const commentsByPath = useMemo(() => {
+        const m = new Map<string, DiffComment[]>();
+        for (const [path, list] of Object.entries(comments)) m.set(path, list);
+        return m;
+    }, [comments]);
 
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
 
@@ -293,6 +314,9 @@ export default function App() {
         }
         if (!filePath) return;
         setOpenMap((m) => (m[filePath!] ? m : { ...m, [filePath!]: true }));
+        setForceMountPath(filePath);
+        const cardEl = document.getElementById(fileCardId(filePath));
+        cardEl?.scrollIntoView({ behavior: "smooth", block: "start" });
         setDiffFlashCommentId(id);
     }, []);
 
@@ -307,10 +331,13 @@ export default function App() {
                 el.scrollIntoView({ behavior: "smooth", block: "center" });
                 return;
             }
-            if (attempts++ < 30) requestAnimationFrame(tryScroll);
+            if (attempts++ < 60) requestAnimationFrame(tryScroll);
         };
         requestAnimationFrame(tryScroll);
-        const t = window.setTimeout(() => setDiffFlashCommentId(null), 1400);
+        const t = window.setTimeout(() => {
+            setDiffFlashCommentId(null);
+            setForceMountPath(null);
+        }, 1800);
         return () => {
             cancelled = true;
             window.clearTimeout(t);
@@ -380,15 +407,13 @@ export default function App() {
                                     key={f.path}
                                     file={f}
                                     open={openMap[f.path] ?? true}
-                                    onOpenChange={(o) => setOpen(f.path, o)}
+                                    onOpenChange={setOpen}
                                     viewMode={viewMode}
                                     wrap={wrap}
-                                    comments={comments[f.path] ?? []}
-                                    activeDraft={
-                                        activeDraft && activeDraft.filePath === f.path
-                                            ? activeDraft
-                                            : null
-                                    }
+                                    comments={commentsByPath.get(f.path) ?? EMPTY_COMMENTS}
+                                    patchIndex={patchIndexByPath.get(f.path) ?? EMPTY_PATCH_INDEX}
+                                    activeDraft={activeDraft}
+                                    forceMountBody={forceMountPath === f.path}
                                     onRequestDraft={requestDraft}
                                     onCancelDraft={cancelDraft}
                                     onSaveDraft={saveDraft}
