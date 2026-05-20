@@ -1,5 +1,7 @@
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentIndicator } from "@/components/CommentIndicator";
+import { PatchErrorBoundary } from "@/components/PatchErrorBoundary";
+import { SkippedPreview } from "@/components/SkippedPreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -296,45 +298,46 @@ export function FileCard({
                 <CollapsibleContent className="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden">
                     <div className="px-3 py-2 pl-4">
                         {file.skipped ? (
-                            <div className="bg-muted/30 text-muted-foreground border-border/60 rounded-md border border-dashed px-3 py-8 text-center text-sm">
-                                {file.skipped.reason === "binary"
-                                    ? "Binary file — preview skipped."
-                                    : "File too large — preview skipped."}
-                            </div>
+                            <SkippedPreview reason={file.skipped.reason} />
                         ) : (
-                            <div className="bg-background/40 overflow-x-auto">
-                                <PatchDiff<AnnotationMeta>
-                                    patch={file.rawPatch}
-                                    options={diffOptions}
-                                    lineAnnotations={lineAnnotations}
-                                    renderAnnotation={(a) => {
-                                        if (a.metadata.kind === "draft") {
+                            <PatchErrorBoundary
+                                key={file.path}
+                                fallback={<SkippedPreview reason="render-error" />}
+                            >
+                                <div className="bg-background/40 overflow-x-auto">
+                                    <PatchDiff<AnnotationMeta>
+                                        patch={file.rawPatch}
+                                        options={diffOptions}
+                                        lineAnnotations={lineAnnotations}
+                                        renderAnnotation={(a) => {
+                                            if (a.metadata.kind === "draft") {
+                                                return (
+                                                    <CommentComposer
+                                                        onSave={onSaveDraft}
+                                                        onCancel={onCancelDraft}
+                                                    />
+                                                );
+                                            }
                                             return (
-                                                <CommentComposer
-                                                    onSave={onSaveDraft}
-                                                    onCancel={onCancelDraft}
+                                                <CommentIndicator
+                                                    comment={a.metadata.comment}
+                                                    onEdit={onEditComment}
+                                                    onDelete={onDeleteComment}
+                                                    onFocusInSidebar={onFocusComment}
+                                                    flash={flashCommentId === a.metadata.comment.id}
                                                 />
                                             );
+                                        }}
+                                        renderGutterUtility={(getHover) =>
+                                            hoverOccupied ? null : (
+                                                <GutterAddButton
+                                                    onClick={() => handleGutterClick(getHover)}
+                                                />
+                                            )
                                         }
-                                        return (
-                                            <CommentIndicator
-                                                comment={a.metadata.comment}
-                                                onEdit={onEditComment}
-                                                onDelete={onDeleteComment}
-                                                onFocusInSidebar={onFocusComment}
-                                                flash={flashCommentId === a.metadata.comment.id}
-                                            />
-                                        );
-                                    }}
-                                    renderGutterUtility={(getHover) =>
-                                        hoverOccupied ? null : (
-                                            <GutterAddButton
-                                                onClick={() => handleGutterClick(getHover)}
-                                            />
-                                        )
-                                    }
-                                />
-                            </div>
+                                    />
+                                </div>
+                            </PatchErrorBoundary>
                         )}
                     </div>
                 </CollapsibleContent>

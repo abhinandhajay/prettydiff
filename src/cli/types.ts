@@ -8,7 +8,7 @@ export interface ParsedFile {
     deletions: number;
     rawPatch: string;
     binary?: boolean;
-    skipped?: { reason: "binary" | "too-large"; sizeBytes?: number };
+    skipped?: { reason: "binary" | "too-large" | "no-hunks"; sizeBytes?: number };
 }
 
 export interface DiffPayload {
