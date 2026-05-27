@@ -4,11 +4,10 @@ const PAINT_MARGIN = "2000px 0px";
 
 interface Props {
     estimatedHeight: number;
-    forceMount?: boolean;
     children: React.ReactNode;
 }
 
-export function LazyDiffBody({ estimatedHeight, forceMount, children }: Props) {
+export function LazyDiffBody({ estimatedHeight, children }: Props) {
     const [near, setNear] = useState(false);
 
     const setRef = useCallback((node: HTMLDivElement | null) => {
@@ -27,7 +26,7 @@ export function LazyDiffBody({ estimatedHeight, forceMount, children }: Props) {
         <div
             ref={setRef}
             style={{
-                contentVisibility: forceMount || near ? "visible" : "auto",
+                contentVisibility: near ? "visible" : "auto",
                 containIntrinsicSize: `auto ${estimatedHeight}px`,
             }}
         >

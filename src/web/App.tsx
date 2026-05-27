@@ -36,8 +36,6 @@ export default function App() {
     const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
     const [activePath, setActivePath] = useState<string | null>(null);
 
-    const [forceMountPath, setForceMountPath] = useState<string | null>(null);
-
     const [comments, setComments] = usePersistedState<CommentMap>("prettydiff:comments", {});
     const [showCommentsSidebar, setShowCommentsSidebar] = usePersistedState<boolean>(
         "prettydiff:comments-open",
@@ -314,30 +312,43 @@ export default function App() {
         }
         if (!filePath) return;
         setOpenMap((m) => (m[filePath!] ? m : { ...m, [filePath!]: true }));
-        setForceMountPath(filePath);
-        const cardEl = document.getElementById(fileCardId(filePath));
-        cardEl?.scrollIntoView({ behavior: "smooth", block: "start" });
         setDiffFlashCommentId(id);
     }, []);
 
     useEffect(() => {
         if (!diffFlashCommentId) return;
+        const scroller = mainRef.current;
+        if (!scroller) return;
         let cancelled = false;
         let attempts = 0;
-        const tryScroll = () => {
-            if (cancelled) return;
-            const el = document.getElementById(commentIndicatorDomId(diffFlashCommentId));
-            if (el) {
-                el.scrollIntoView({ behavior: "smooth", block: "center" });
+        let frames = 0;
+        let velocity = 0;
+        const findEl = () => document.getElementById(commentIndicatorDomId(diffFlashCommentId));
+        // Velocity-smoothed reactive easing. Each frame's target velocity is
+        // proportional to remaining distance; actual velocity is a low-pass-
+        // filtered version, so motion ramps up smoothly at the start, holds
+        // a steady pace, and decelerates gently at the end — instead of
+        // pure exponential decay's snappy start and crawling tail.
+        const animate = () => {
+            if (cancelled || frames++ > 240) return;
+            const el = findEl();
+            if (!el) {
+                if (attempts++ < 60) requestAnimationFrame(animate);
                 return;
             }
-            if (attempts++ < 60) requestAnimationFrame(tryScroll);
+            const sRect = scroller.getBoundingClientRect();
+            const rect = el.getBoundingClientRect();
+            const offset = rect.top + rect.height / 2 - (sRect.top + sRect.height / 2);
+            const targetVelocity = offset * 0.18;
+            velocity = velocity * 0.78 + targetVelocity * 0.22;
+            if (Math.abs(offset) < 0.5 && Math.abs(velocity) < 0.3) return;
+            scroller.scrollTop += velocity;
+            requestAnimationFrame(animate);
         };
-        requestAnimationFrame(tryScroll);
+        requestAnimationFrame(animate);
         const t = window.setTimeout(() => {
             setDiffFlashCommentId(null);
-            setForceMountPath(null);
-        }, 1800);
+        }, 3000);
         return () => {
             cancelled = true;
             window.clearTimeout(t);
@@ -415,7 +426,6 @@ export default function App() {
                                     activeDraft={
                                         activeDraft?.filePath === f.path ? activeDraft : null
                                     }
-                                    forceMountBody={forceMountPath === f.path}
                                     onRequestDraft={requestDraft}
                                     onCancelDraft={cancelDraft}
                                     onSaveDraft={saveDraft}
