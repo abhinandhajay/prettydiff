@@ -152,7 +152,6 @@ function FileCardImpl({
     flashCommentId,
 }: Props) {
     const { dir, base } = splitPath(file.path);
-    const draftForFile = activeDraft && activeDraft.filePath === file.path ? activeDraft : null;
 
     const handleOpenChange = useCallback(
         (next: boolean) => onOpenChange(file.path, next),
@@ -172,18 +171,18 @@ function FileCardImpl({
             });
         }
 
-        if (draftForFile) {
-            if (!grouped.has(commentKey(draftForFile))) {
+        if (activeDraft) {
+            if (!grouped.has(commentKey(activeDraft))) {
                 annotations.push({
-                    side: draftForFile.side,
-                    lineNumber: draftForFile.lineNumber,
+                    side: activeDraft.side,
+                    lineNumber: activeDraft.lineNumber,
                     metadata: { kind: "draft" },
                 });
             }
         }
 
         return annotations;
-    }, [comments, draftForFile]);
+    }, [comments, activeDraft]);
 
     const handleGutterClick = useCallback(
         (getHover: () => { lineNumber: number; side: CommentSide } | undefined) => {

@@ -412,7 +412,9 @@ export default function App() {
                                     wrap={wrap}
                                     comments={commentsByPath.get(f.path) ?? EMPTY_COMMENTS}
                                     patchIndex={patchIndexByPath.get(f.path) ?? EMPTY_PATCH_INDEX}
-                                    activeDraft={activeDraft}
+                                    activeDraft={
+                                        activeDraft?.filePath === f.path ? activeDraft : null
+                                    }
                                     forceMountBody={forceMountPath === f.path}
                                     onRequestDraft={requestDraft}
                                     onCancelDraft={cancelDraft}
