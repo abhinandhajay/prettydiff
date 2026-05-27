@@ -16,6 +16,7 @@ import { fileCardId } from "@/lib/slug";
 import { sortFilesForTree } from "@/lib/treeSort";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
@@ -23,6 +24,7 @@ import type { CommentMap, DiffComment, DiffPayload, DraftLine } from "@/lib/type
 
 const EMPTY_COMMENTS: DiffComment[] = [];
 const EMPTY_PATCH_INDEX: PatchLineIndex = { additions: new Map(), deletions: new Map() };
+const HUGE_DIFF_LINE_THRESHOLD = 5000;
 
 export default function App() {
     const [payload, setPayload] = useState<DiffPayload | null>(null);
@@ -45,6 +47,8 @@ export default function App() {
     const [activeDraft, setActiveDraft] = useState<DraftLine | null>(null);
     const [scrollToCommentId, setScrollToCommentId] = useState<string | null>(null);
     const [diffFlashCommentId, setDiffFlashCommentId] = useState<string | null>(null);
+    const [loadingHint, setLoadingHint] = useState<{ files: number; lines: number } | null>(null);
+    const [mountReady, setMountReady] = useState(false);
 
     const mainRef = useRef<HTMLElement>(null);
 
@@ -57,7 +61,25 @@ export default function App() {
         (mode: "initial" | "reload") => {
             if (mode === "reload") setIsReloading(true);
             fetchDiff()
-                .then((p) => {
+                .then(async (p) => {
+                    if (mode === "initial") {
+                        const lines = p.files.reduce(
+                            (s, f) => s + f.rawPatch.split("\n").length,
+                            0,
+                        );
+                        if (lines > HUGE_DIFF_LINE_THRESHOLD) {
+                            // flushSync commits the hint immediately; double
+                            // rAF guarantees a paint cycle happens before the
+                            // mount blocks the main thread, so the user sees
+                            // the message rather than just the generic spinner.
+                            flushSync(() => {
+                                setLoadingHint({ files: p.files.length, lines });
+                            });
+                            await new Promise<void>((r) =>
+                                requestAnimationFrame(() => requestAnimationFrame(() => r())),
+                            );
+                        }
+                    }
                     setPayload(p);
                     const indexByPath = new Map<string, PatchLineIndex>();
                     for (const f of p.files) indexByPath.set(f.path, buildPatchIndex(f.rawPatch));
@@ -356,6 +378,33 @@ export default function App() {
     }, [diffFlashCommentId]);
 
     useEffect(() => {
+        if (!payload) {
+            setMountReady(false);
+            return;
+        }
+        if (!loadingHint) {
+            setMountReady(true);
+            return;
+        }
+        // Large diff: keep the loading overlay up until the browser is fully
+        // idle — mount commit, initial paint, content-visibility paint of
+        // near-viewport cards, and any post-mount effects have all completed.
+        type Win = Window & {
+            requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+            cancelIdleCallback?: (id: number) => void;
+        };
+        const win = window as Win;
+        if (typeof win.requestIdleCallback === "function") {
+            const id = win.requestIdleCallback(() => setMountReady(true), {
+                timeout: 1500,
+            });
+            return () => win.cancelIdleCallback?.(id);
+        }
+        const id = window.setTimeout(() => setMountReady(true), 300);
+        return () => window.clearTimeout(id);
+    }, [payload, loadingHint]);
+
+    useEffect(() => {
         if (!activeDraft) return;
         const list = comments[activeDraft.filePath] ?? [];
         const k = commentKey(activeDraft);
@@ -373,16 +422,35 @@ export default function App() {
             </div>
         );
     }
+
+    const overlayVisible = !payload || !mountReady;
+    const overlay = (
+        <div
+            aria-hidden={!overlayVisible}
+            className="bg-background absolute inset-0 z-50 flex flex-col transition-opacity duration-200"
+            style={{
+                opacity: overlayVisible ? 1 : 0,
+                pointerEvents: overlayVisible ? "auto" : "none",
+            }}
+        >
+            <EmptyState
+                kind="loading"
+                title={loadingHint ? "Preparing large diff…" : "Loading…"}
+                message={
+                    loadingHint
+                        ? `${loadingHint.files} files, ~${(loadingHint.lines / 1000).toFixed(1)}k lines. This may take a moment.`
+                        : undefined
+                }
+            />
+        </div>
+    );
+
     if (!payload) {
-        return (
-            <div className="bg-background flex min-h-screen flex-col">
-                <EmptyState kind="loading" title="Loading…" />
-            </div>
-        );
+        return <div className="bg-background relative flex min-h-screen flex-col">{overlay}</div>;
     }
 
     return (
-        <div className="bg-background flex h-screen flex-col overflow-hidden">
+        <div className="bg-background relative flex h-screen flex-col overflow-hidden">
             <Header
                 payload={payload}
                 viewMode={viewMode}
@@ -455,6 +523,7 @@ export default function App() {
                     </div>
                 </div>
             )}
+            {overlay}
         </div>
     );
 }
