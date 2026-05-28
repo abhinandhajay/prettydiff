@@ -17,10 +17,15 @@ export default defineConfig({
             name: "prettydiff-dev-fixture",
             configureServer(server) {
                 server.middlewares.use(async (req, res, next) => {
-                    if (req.url === "/api/diff") {
+                    if (req.url && req.url.startsWith("/api/diff")) {
+                        const url = new URL(req.url, "http://localhost");
+                        const fixture =
+                            url.searchParams.get("fixture") === "xl"
+                                ? "sample-diff-xl.json"
+                                : "sample-diff.json";
                         try {
                             const text = await readFile(
-                                path.join(here, "fixtures", "sample-diff.json"),
+                                path.join(here, "fixtures", fixture),
                                 "utf8",
                             );
                             res.setHeader("content-type", "application/json");

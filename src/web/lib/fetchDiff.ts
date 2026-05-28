@@ -1,7 +1,8 @@
 import type { DiffPayload } from "./types";
 
 export async function fetchDiff(): Promise<DiffPayload> {
-    const r = await fetch("/api/diff");
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    const r = await fetch(`/api/diff${search}`);
     if (!r.ok) {
         throw new Error(`fetch /api/diff failed: ${r.status}`);
     }

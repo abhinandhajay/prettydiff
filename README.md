@@ -68,6 +68,8 @@ Run the web viewer in isolation against the sample fixture (Vite, port 5173, ser
 bun run dev
 ```
 
+For perf work, append `?fixture=xl` to the URL to load `fixtures/sample-diff-xl.json` — a synthetic 53-file, 10k+ line diff. Regenerate it with `bun scripts/build-xl-fixture.ts`; the generator is deterministic.
+
 To try the dev build against a real repo, run `bun run build`, then from inside that repo run `node /path/to/prettydiff/dist/cli/bin.js`. This leaves any globally-installed `prettydiff` untouched.
 
 Alternatively, run `bun link` once to put the dev build on your PATH as `prettydiff` — convenient for full-time development, but it shadows any globally-installed version until you `bun unlink @abhinandhajay/prettydiff`.
@@ -87,7 +89,8 @@ Alternatively, run `bun link` once to put the dev build on your PATH as `prettyd
 
 - **`src/cli/`** — Node-side CLI: arg parsing, git ops, Hono server, port discovery, update check
 - **`src/web/`** — React + Vite viewer (components, lib, styles)
-- **`fixtures/sample-diff.json`** — Dev-mode mock payload served by Vite at `/api/diff`
+- **`fixtures/`** — Dev-mode mock payloads served by Vite at `/api/diff` (`sample-diff.json` by default, `sample-diff-xl.json` with `?fixture=xl`)
+- **`scripts/build-xl-fixture.ts`** — Generator for the XL fixture
 
 ## Tech stack
 
