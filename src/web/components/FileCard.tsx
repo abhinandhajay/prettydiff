@@ -5,7 +5,7 @@ import { PatchErrorBoundary } from "@/components/PatchErrorBoundary";
 import { SkippedPreview } from "@/components/SkippedPreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { commentKey, commentsByKey } from "@/lib/comments";
 import { fileCardId } from "@/lib/slug";
 import { cn } from "@/lib/utils";
@@ -303,56 +303,64 @@ function FileCardImpl({
                         </Button>
                     </div>
                 </div>
-                <CollapsibleContent className="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden">
-                    <div className="px-3 py-2 pl-4">
-                        {file.skipped ? (
-                            <SkippedPreview reason={file.skipped.reason} />
-                        ) : (
-                            <PatchErrorBoundary
-                                key={file.path}
-                                fallback={<SkippedPreview reason="render-error" />}
-                            >
-                                <LazyDiffBody estimatedHeight={estimatedHeight}>
-                                    <div className="bg-background/40 overflow-x-auto">
-                                        <PatchDiff<AnnotationMeta>
-                                            patch={file.rawPatch}
-                                            options={diffOptions}
-                                            lineAnnotations={lineAnnotations}
-                                            renderAnnotation={(a) => {
-                                                if (a.metadata.kind === "draft") {
+                <div
+                    className="grid transition-[grid-template-rows] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                    style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+                >
+                    <div className="overflow-hidden">
+                        <div className="px-3 py-2 pl-4">
+                            {file.skipped ? (
+                                <SkippedPreview reason={file.skipped.reason} />
+                            ) : (
+                                <PatchErrorBoundary
+                                    key={file.path}
+                                    fallback={<SkippedPreview reason="render-error" />}
+                                >
+                                    <LazyDiffBody estimatedHeight={estimatedHeight}>
+                                        <div className="bg-background/40 overflow-x-auto">
+                                            <PatchDiff<AnnotationMeta>
+                                                patch={file.rawPatch}
+                                                options={diffOptions}
+                                                lineAnnotations={lineAnnotations}
+                                                renderAnnotation={(a) => {
+                                                    if (a.metadata.kind === "draft") {
+                                                        return (
+                                                            <CommentComposer
+                                                                onSave={onSaveDraft}
+                                                                onCancel={onCancelDraft}
+                                                            />
+                                                        );
+                                                    }
                                                     return (
-                                                        <CommentComposer
-                                                            onSave={onSaveDraft}
-                                                            onCancel={onCancelDraft}
+                                                        <CommentIndicator
+                                                            comment={a.metadata.comment}
+                                                            onEdit={onEditComment}
+                                                            onDelete={onDeleteComment}
+                                                            onFocusInSidebar={onFocusComment}
+                                                            flash={
+                                                                flashCommentId ===
+                                                                a.metadata.comment.id
+                                                            }
                                                         />
                                                     );
+                                                }}
+                                                renderGutterUtility={(getHover) =>
+                                                    hoverOccupied ? null : (
+                                                        <GutterAddButton
+                                                            onClick={() =>
+                                                                handleGutterClick(getHover)
+                                                            }
+                                                        />
+                                                    )
                                                 }
-                                                return (
-                                                    <CommentIndicator
-                                                        comment={a.metadata.comment}
-                                                        onEdit={onEditComment}
-                                                        onDelete={onDeleteComment}
-                                                        onFocusInSidebar={onFocusComment}
-                                                        flash={
-                                                            flashCommentId === a.metadata.comment.id
-                                                        }
-                                                    />
-                                                );
-                                            }}
-                                            renderGutterUtility={(getHover) =>
-                                                hoverOccupied ? null : (
-                                                    <GutterAddButton
-                                                        onClick={() => handleGutterClick(getHover)}
-                                                    />
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                </LazyDiffBody>
-                            </PatchErrorBoundary>
-                        )}
+                                            />
+                                        </div>
+                                    </LazyDiffBody>
+                                </PatchErrorBoundary>
+                            )}
+                        </div>
                     </div>
-                </CollapsibleContent>
+                </div>
             </Collapsible>
         </div>
     );
