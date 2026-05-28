@@ -38,6 +38,8 @@ interface DiffRenderMeta {
     totalLines: number;
 }
 
+const EMPTY_RENDER_META: DiffRenderMeta = { byPath: new Map(), totalLines: 0 };
+
 function shouldShowLargeDiffHint(lineCount: number): boolean {
     return lineCount > HUGE_DIFF_LINE_THRESHOLD;
 }
@@ -84,6 +86,7 @@ export default function App() {
     );
     const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set());
     const [activeDraft, setActiveDraft] = useState<DraftLine | null>(null);
+    const [fileRenderMeta, setFileRenderMeta] = useState<DiffRenderMeta>(EMPTY_RENDER_META);
     const [scrollToCommentId, setScrollToCommentId] = useState<string | null>(null);
     const [diffFlashCommentId, setDiffFlashCommentId] = useState<string | null>(null);
     const [largeDiffHint, setLargeDiffHint] = useState<{ files: number; lines: number } | null>(
@@ -126,6 +129,7 @@ export default function App() {
                     const indexByPath = patchIndexesFromMeta(renderMeta.byPath);
                     const stamped = markStaleComments(commentsRef.current, p.files, indexByPath);
                     setPayload(p);
+                    setFileRenderMeta(renderMeta);
                     if (stamped !== commentsRef.current) {
                         setComments(stamped);
                     }
@@ -243,14 +247,6 @@ export default function App() {
     }, [payload]);
 
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
-
-    const fileRenderMeta = useMemo(
-        () =>
-            payload
-                ? buildRenderMeta(payload.files)
-                : { byPath: new Map<string, DiffFileRenderMeta>(), totalLines: 0 },
-        [payload],
-    );
 
     const totalCommentCount = useMemo(
         () => Object.values(comments).reduce((n, list) => n + list.length, 0),
@@ -439,13 +435,15 @@ export default function App() {
             cancelIdleCallback?: (id: number) => void;
         };
         const win = window as Win;
+        const markReady = () => {
+            setMountReady(true);
+            setLargeDiffHint(null);
+        };
         if (typeof win.requestIdleCallback === "function") {
-            const id = win.requestIdleCallback(() => setMountReady(true), {
-                timeout: 1500,
-            });
+            const id = win.requestIdleCallback(markReady, { timeout: 1500 });
             return () => win.cancelIdleCallback?.(id);
         }
-        const id = window.setTimeout(() => setMountReady(true), 300);
+        const id = window.setTimeout(markReady, 300);
         return () => window.clearTimeout(id);
     }, [payload, largeDiffHint]);
 
