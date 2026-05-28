@@ -67,6 +67,7 @@ interface Props {
     wrap: boolean;
     comments: DiffComment[];
     patchIndex: PatchLineIndex;
+    estimatedHeight: number;
     activeDraft: DraftLine | null;
     onRequestDraft: (draft: DraftLine) => void;
     onCancelDraft: () => void;
@@ -140,6 +141,7 @@ function FileCardImpl({
     wrap,
     comments,
     patchIndex,
+    estimatedHeight,
     activeDraft,
     onRequestDraft,
     onCancelDraft,
@@ -310,9 +312,7 @@ function FileCardImpl({
                                 key={file.path}
                                 fallback={<SkippedPreview reason="render-error" />}
                             >
-                                <LazyDiffBody
-                                    estimatedHeight={56 + file.rawPatch.split("\n").length * 18}
-                                >
+                                <LazyDiffBody estimatedHeight={estimatedHeight}>
                                     <div className="bg-background/40 overflow-x-auto">
                                         <PatchDiff<AnnotationMeta>
                                             patch={file.rawPatch}

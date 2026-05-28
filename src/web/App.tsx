@@ -20,17 +20,56 @@ import { flushSync } from "react-dom";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
-import type { CommentMap, DiffComment, DiffPayload, DraftLine } from "@/lib/types";
+import type { CommentMap, DiffComment, DiffPayload, DraftLine, ParsedFile } from "@/lib/types";
 
 const EMPTY_COMMENTS: DiffComment[] = [];
 const EMPTY_PATCH_INDEX: PatchLineIndex = { additions: new Map(), deletions: new Map() };
 const HUGE_DIFF_LINE_THRESHOLD = 5000;
+const ESTIMATED_DIFF_HEADER_HEIGHT = 56;
+const ESTIMATED_DIFF_LINE_HEIGHT = 18;
+
+interface DiffFileRenderMeta {
+    estimatedHeight: number;
+    patchIndex: PatchLineIndex;
+}
+
+interface DiffRenderMeta {
+    byPath: Map<string, DiffFileRenderMeta>;
+    totalLines: number;
+}
+
+function shouldShowLargeDiffHint(lineCount: number): boolean {
+    return lineCount > HUGE_DIFF_LINE_THRESHOLD;
+}
+
+function yieldForPaint(): Promise<void> {
+    return new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+}
+
+function buildRenderMeta(files: ParsedFile[]): DiffRenderMeta {
+    const byPath = new Map<string, DiffFileRenderMeta>();
+    let totalLines = 0;
+    for (const file of files) {
+        const lineCount = file.rawPatch.split("\n").length;
+        totalLines += lineCount;
+        byPath.set(file.path, {
+            estimatedHeight: ESTIMATED_DIFF_HEADER_HEIGHT + lineCount * ESTIMATED_DIFF_LINE_HEIGHT,
+            patchIndex: buildPatchIndex(file.rawPatch),
+        });
+    }
+    return { byPath, totalLines };
+}
+
+function patchIndexesFromMeta(metaByPath: DiffRenderMeta["byPath"]): Map<string, PatchLineIndex> {
+    const indexes = new Map<string, PatchLineIndex>();
+    for (const [path, meta] of metaByPath) indexes.set(path, meta.patchIndex);
+    return indexes;
+}
 
 export default function App() {
     const [payload, setPayload] = useState<DiffPayload | null>(null);
-    const [patchIndexByPath, setPatchIndexByPath] = useState<Map<string, PatchLineIndex>>(
-        () => new Map(),
-    );
     const [error, setError] = useState<string | null>(null);
     const [isReloading, setIsReloading] = useState(false);
     const [viewMode, setViewMode] = usePersistedState<ViewMode>("prettydiff:view", "unified");
@@ -47,7 +86,9 @@ export default function App() {
     const [activeDraft, setActiveDraft] = useState<DraftLine | null>(null);
     const [scrollToCommentId, setScrollToCommentId] = useState<string | null>(null);
     const [diffFlashCommentId, setDiffFlashCommentId] = useState<string | null>(null);
-    const [loadingHint, setLoadingHint] = useState<{ files: number; lines: number } | null>(null);
+    const [largeDiffHint, setLargeDiffHint] = useState<{ files: number; lines: number } | null>(
+        null,
+    );
     const [mountReady, setMountReady] = useState(false);
 
     const mainRef = useRef<HTMLElement>(null);
@@ -60,31 +101,31 @@ export default function App() {
     const loadDiff = useCallback(
         (mode: "initial" | "reload") => {
             if (mode === "reload") setIsReloading(true);
+            if (mode === "initial") {
+                setMountReady(false);
+                setLargeDiffHint(null);
+            }
             fetchDiff()
                 .then(async (p) => {
+                    const renderMeta = buildRenderMeta(p.files);
                     if (mode === "initial") {
-                        const lines = p.files.reduce(
-                            (s, f) => s + f.rawPatch.split("\n").length,
-                            0,
-                        );
-                        if (lines > HUGE_DIFF_LINE_THRESHOLD) {
+                        if (shouldShowLargeDiffHint(renderMeta.totalLines)) {
                             // flushSync commits the hint immediately; double
                             // rAF guarantees a paint cycle happens before the
                             // mount blocks the main thread, so the user sees
                             // the message rather than just the generic spinner.
                             flushSync(() => {
-                                setLoadingHint({ files: p.files.length, lines });
+                                setLargeDiffHint({
+                                    files: p.files.length,
+                                    lines: renderMeta.totalLines,
+                                });
                             });
-                            await new Promise<void>((r) =>
-                                requestAnimationFrame(() => requestAnimationFrame(() => r())),
-                            );
+                            await yieldForPaint();
                         }
                     }
-                    setPayload(p);
-                    const indexByPath = new Map<string, PatchLineIndex>();
-                    for (const f of p.files) indexByPath.set(f.path, buildPatchIndex(f.rawPatch));
-                    setPatchIndexByPath(indexByPath);
+                    const indexByPath = patchIndexesFromMeta(renderMeta.byPath);
                     const stamped = markStaleComments(commentsRef.current, p.files, indexByPath);
+                    setPayload(p);
                     if (stamped !== commentsRef.current) {
                         setComments(stamped);
                     }
@@ -120,8 +161,12 @@ export default function App() {
                     }
                 })
                 .catch((e) => {
-                    if (mode === "initial") setError(e?.message ?? String(e));
-                    else console.warn("prettydiff: reload failed", e);
+                    if (mode === "initial") {
+                        setLargeDiffHint(null);
+                        setError(e?.message ?? String(e));
+                    } else {
+                        console.warn("prettydiff: reload failed", e);
+                    }
                 })
                 .finally(() => {
                     if (mode === "reload") setIsReloading(false);
@@ -168,44 +213,44 @@ export default function App() {
         if (!main) return;
         const cards = Array.from(main.querySelectorAll<HTMLElement>("[data-file-path]"));
         if (cards.length === 0) return;
-
-        const visible = new Map<string, DOMRectReadOnly>();
-        const recompute = () => {
-            if (visible.size === 0) return;
-            let topPath: string | null = null;
-            let topY = Infinity;
-            for (const [path, rect] of visible) {
-                if (rect.top < topY) {
-                    topY = rect.top;
-                    topPath = path;
+        let raf = 0;
+        const stickyOffset = main.getBoundingClientRect().top;
+        const compute = () => {
+            raf = 0;
+            let active: string | null = cards[0]?.dataset.filePath ?? null;
+            for (const card of cards) {
+                if (card.getBoundingClientRect().top - stickyOffset <= 1) {
+                    active = card.dataset.filePath ?? active;
+                } else {
+                    break;
                 }
             }
-            if (topPath) setActivePath(topPath);
+            if (active) setActivePath(active);
         };
-
-        const io = new IntersectionObserver(
-            (entries) => {
-                for (const e of entries) {
-                    const path = (e.target as HTMLElement).dataset.filePath;
-                    if (!path) continue;
-                    if (e.isIntersecting) visible.set(path, e.boundingClientRect);
-                    else visible.delete(path);
-                }
-                recompute();
-            },
-            { root: main, rootMargin: "0px 0px -85% 0px", threshold: [0, 1] },
-        );
-        cards.forEach((c) => io.observe(c));
-        return () => io.disconnect();
+        const schedule = () => {
+            if (raf) return;
+            raf = window.requestAnimationFrame(compute);
+        };
+        schedule();
+        main.addEventListener("scroll", schedule, { passive: true });
+        const ro = new ResizeObserver(schedule);
+        cards.forEach((c) => ro.observe(c));
+        return () => {
+            main.removeEventListener("scroll", schedule);
+            ro.disconnect();
+            if (raf) window.cancelAnimationFrame(raf);
+        };
     }, [payload]);
 
-    const commentsByPath = useMemo(() => {
-        const m = new Map<string, DiffComment[]>();
-        for (const [path, list] of Object.entries(comments)) m.set(path, list);
-        return m;
-    }, [comments]);
-
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
+
+    const fileRenderMeta = useMemo(
+        () =>
+            payload
+                ? buildRenderMeta(payload.files)
+                : { byPath: new Map<string, DiffFileRenderMeta>(), totalLines: 0 },
+        [payload],
+    );
 
     const totalCommentCount = useMemo(
         () => Object.values(comments).reduce((n, list) => n + list.length, 0),
@@ -382,7 +427,7 @@ export default function App() {
             setMountReady(false);
             return;
         }
-        if (!loadingHint) {
+        if (!largeDiffHint) {
             setMountReady(true);
             return;
         }
@@ -402,7 +447,7 @@ export default function App() {
         }
         const id = window.setTimeout(() => setMountReady(true), 300);
         return () => window.clearTimeout(id);
-    }, [payload, loadingHint]);
+    }, [payload, largeDiffHint]);
 
     useEffect(() => {
         if (!activeDraft) return;
@@ -435,10 +480,10 @@ export default function App() {
         >
             <EmptyState
                 kind="loading"
-                title={loadingHint ? "Preparing large diff…" : "Loading…"}
+                title={largeDiffHint ? "Preparing large diff…" : "Loading…"}
                 message={
-                    loadingHint
-                        ? `${loadingHint.files} files, ~${(loadingHint.lines / 1000).toFixed(1)}k lines. This may take a moment.`
+                    largeDiffHint
+                        ? `${largeDiffHint.files} files, ~${(largeDiffHint.lines / 1000).toFixed(1)}k lines. This may take a moment.`
                         : undefined
                 }
             />
@@ -481,28 +526,32 @@ export default function App() {
                     />
                     <main ref={mainRef} className="min-h-0 overflow-y-auto">
                         <div className="space-y-3 px-5 py-5">
-                            {sortedFiles.map((f) => (
-                                <FileCard
-                                    key={f.path}
-                                    file={f}
-                                    open={openMap[f.path] ?? true}
-                                    onOpenChange={setOpen}
-                                    viewMode={viewMode}
-                                    wrap={wrap}
-                                    comments={commentsByPath.get(f.path) ?? EMPTY_COMMENTS}
-                                    patchIndex={patchIndexByPath.get(f.path) ?? EMPTY_PATCH_INDEX}
-                                    activeDraft={
-                                        activeDraft?.filePath === f.path ? activeDraft : null
-                                    }
-                                    onRequestDraft={requestDraft}
-                                    onCancelDraft={cancelDraft}
-                                    onSaveDraft={saveDraft}
-                                    onFocusComment={focusComment}
-                                    onEditComment={editComment}
-                                    onDeleteComment={deleteComment}
-                                    flashCommentId={diffFlashCommentId}
-                                />
-                            ))}
+                            {sortedFiles.map((f) => {
+                                const meta = fileRenderMeta.byPath.get(f.path);
+                                return (
+                                    <FileCard
+                                        key={f.path}
+                                        file={f}
+                                        open={openMap[f.path] ?? true}
+                                        onOpenChange={setOpen}
+                                        viewMode={viewMode}
+                                        wrap={wrap}
+                                        comments={comments[f.path] ?? EMPTY_COMMENTS}
+                                        patchIndex={meta?.patchIndex ?? EMPTY_PATCH_INDEX}
+                                        estimatedHeight={meta?.estimatedHeight ?? 0}
+                                        activeDraft={
+                                            activeDraft?.filePath === f.path ? activeDraft : null
+                                        }
+                                        onRequestDraft={requestDraft}
+                                        onCancelDraft={cancelDraft}
+                                        onSaveDraft={saveDraft}
+                                        onFocusComment={focusComment}
+                                        onEditComment={editComment}
+                                        onDeleteComment={deleteComment}
+                                        flashCommentId={diffFlashCommentId}
+                                    />
+                                );
+                            })}
                         </div>
                     </main>
                     <div className="h-full overflow-hidden">

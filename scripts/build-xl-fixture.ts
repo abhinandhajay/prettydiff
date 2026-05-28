@@ -13,6 +13,8 @@ import type { DiffPayload, FileStatus, ParsedFile } from "../src/cli/types";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..");
 
+// Deterministic random helpers
+
 // Tiny deterministic PRNG (mulberry32) — stable output across runs.
 function rng(seed: number): () => number {
     let s = seed >>> 0;
@@ -28,6 +30,8 @@ function rng(seed: number): () => number {
 const rand = rng(0xc0ffee);
 const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rand() * arr.length)]!;
 const randInt = (min: number, max: number) => min + Math.floor(rand() * (max - min + 1));
+
+// Synthetic file paths and source lines
 
 const EXTS = [
     "ts",
@@ -230,11 +234,6 @@ function buildHunk(ext: Ext, oldStart: number, newStart: number): HunkSpec {
         oldLines++;
         newLines++;
     }
-    // ensure each hunk produces at least one change
-    if (deletes === 0 && adds === 0) {
-        rows.push({ kind: "+", text: randomLine(ext, lineN++) });
-        newLines++;
-    }
     for (let i = 0; i < contextAfter; i++) {
         rows.push({ kind: " ", text: randomLine(ext, lineN++) });
         oldLines++;
@@ -259,6 +258,8 @@ function nextSha(): string {
     shaCounter += 0x12345;
     return shortSha(shaCounter);
 }
+
+// File-status builders
 
 function buildModified(path: string, ext: Ext, hunkCount: number): ParsedFile {
     const hunks: HunkSpec[] = [];
@@ -385,6 +386,8 @@ function buildSkipped(
         skipped: sizeBytes ? { reason, sizeBytes } : { reason },
     };
 }
+
+// Payload assembly
 
 const files: ParsedFile[] = [];
 
