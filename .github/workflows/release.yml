@@ -47,19 +47,13 @@ jobs:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
             - name: Extract CHANGELOG section
-              id: changelog
               run: |
                   version="${VERSION#v}"
-                  notes=$(awk -v v="$version" '
+                  awk -v v="$version" '
                     $0 ~ "^## \\[" v "\\]" { flag=1; next }
                     flag && /^## \[/ { exit }
                     flag { print }
-                  ' CHANGELOG.md)
-                  {
-                    echo "notes<<EOF"
-                    echo "$notes"
-                    echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
+                  ' CHANGELOG.md > release-notes.md
 
             - name: Create GitHub Release
               env:
@@ -67,4 +61,4 @@ jobs:
               run: |
                   gh release create "$VERSION" \
                     --title "$VERSION" \
-                    --notes "${{ steps.changelog.outputs.notes }}"
+                    --notes-file release-notes.md
