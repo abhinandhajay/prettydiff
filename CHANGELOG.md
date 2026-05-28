@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-28
+
+### Changed
+
+- Large diffs now render incrementally and stay responsive: file bodies mount lazily via `content-visibility`, stay mounted when a card is collapsed, and a loading hint shows while a very large diff paints. Previously, opening a repo with large diffs could freeze the viewer.
+- Jumping to a commented line now scrolls with a smooth velocity-based animation instead of snapping instantly.
+
+### Fixed
+
+- A file whose diff throws while rendering now shows an inline "preview skipped" notice instead of breaking the rest of the viewer.
+- Pure renames, mode-only changes, and submodule pointer bumps (diffs with no textual hunks) now show a "no textual changes" placeholder instead of an empty body.
+
 ## [0.2.0] - 2026-05-17
 
 ### Added
@@ -27,5 +39,6 @@ All notable changes to this project are documented here. Format based on [Keep a
 - Detects modified, added, deleted, renamed, and untracked files.
 - Flags: `--port <n>`, `--no-open`, `--version` / `-v`, `--help` / `-h`.
 
+[0.3.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.3.0
 [0.2.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.2.0
 [0.1.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.1.0
