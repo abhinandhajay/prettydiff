@@ -186,6 +186,19 @@ body::before {
         radial-gradient(ellipse 80% 50% at 0% 100%, oklch(0.55 0.065 250 / 0.08), transparent 60%);
 }
 
+/* @pierre/diffs CodeView: frame each file as a card to match the standalone
+   diff-card look. The library keeps headers pinned via its own sticky
+   container, so `overflow: clip` here is safe and just rounds the corners. */
+@layer base {
+    diffs-container {
+        display: block;
+        overflow: clip;
+        border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+        border-radius: var(--radius);
+        background: color-mix(in oklab, var(--card) 80%, transparent);
+    }
+}
+
 /* Thin scrollbar, themed */
 @layer base {
     *::-webkit-scrollbar {

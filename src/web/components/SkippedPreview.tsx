@@ -9,7 +9,7 @@ const MESSAGES: Record<SkippedReason, string> = {
 
 export function SkippedPreview({ reason }: { reason: SkippedReason }) {
     return (
-        <div className="bg-muted/30 text-muted-foreground border-border/60 rounded-md border border-dashed px-3 py-8 text-center text-sm">
+        <div className="text-muted-foreground px-3 py-3 text-center text-sm">
             {MESSAGES[reason]}
         </div>
     );

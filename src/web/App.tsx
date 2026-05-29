@@ -1,7 +1,6 @@
-import { commentIndicatorDomId } from "@/components/CommentIndicator";
 import { CommentsSidebar } from "@/components/CommentsSidebar";
+import { DiffCodeView } from "@/components/DiffCodeView";
 import { EmptyState } from "@/components/EmptyState";
-import { FileCard } from "@/components/FileCard";
 import { FileTreeSidebar } from "@/components/FileTreeSidebar";
 import { Header } from "@/components/Header";
 import {
@@ -12,29 +11,20 @@ import {
     markStaleComments,
 } from "@/lib/comments";
 import { fetchDiff } from "@/lib/fetchDiff";
-import { fileCardId } from "@/lib/slug";
 import { sortFilesForTree } from "@/lib/treeSort";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
+import type { DiffCodeViewHandle } from "@/components/DiffCodeView";
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
 import type { CommentMap, DiffComment, DiffPayload, DraftLine, ParsedFile } from "@/lib/types";
 
-const EMPTY_COMMENTS: DiffComment[] = [];
-const EMPTY_PATCH_INDEX: PatchLineIndex = { additions: new Map(), deletions: new Map() };
 const HUGE_DIFF_LINE_THRESHOLD = 5000;
-const ESTIMATED_DIFF_HEADER_HEIGHT = 56;
-const ESTIMATED_DIFF_LINE_HEIGHT = 18;
-
-interface DiffFileRenderMeta {
-    estimatedHeight: number;
-    patchIndex: PatchLineIndex;
-}
 
 interface DiffRenderMeta {
-    byPath: Map<string, DiffFileRenderMeta>;
+    byPath: Map<string, PatchLineIndex>;
     totalLines: number;
 }
 
@@ -51,23 +41,13 @@ function yieldForPaint(): Promise<void> {
 }
 
 function buildRenderMeta(files: ParsedFile[]): DiffRenderMeta {
-    const byPath = new Map<string, DiffFileRenderMeta>();
+    const byPath = new Map<string, PatchLineIndex>();
     let totalLines = 0;
     for (const file of files) {
-        const lineCount = file.rawPatch.split("\n").length;
-        totalLines += lineCount;
-        byPath.set(file.path, {
-            estimatedHeight: ESTIMATED_DIFF_HEADER_HEIGHT + lineCount * ESTIMATED_DIFF_LINE_HEIGHT,
-            patchIndex: buildPatchIndex(file.rawPatch),
-        });
+        totalLines += file.rawPatch.split("\n").length;
+        byPath.set(file.path, buildPatchIndex(file.rawPatch));
     }
     return { byPath, totalLines };
-}
-
-function patchIndexesFromMeta(metaByPath: DiffRenderMeta["byPath"]): Map<string, PatchLineIndex> {
-    const indexes = new Map<string, PatchLineIndex>();
-    for (const [path, meta] of metaByPath) indexes.set(path, meta.patchIndex);
-    return indexes;
 }
 
 export default function App() {
@@ -94,7 +74,7 @@ export default function App() {
     );
     const [mountReady, setMountReady] = useState(false);
 
-    const mainRef = useRef<HTMLElement>(null);
+    const codeViewRef = useRef<DiffCodeViewHandle>(null);
 
     const commentsRef = useRef(comments);
     useEffect(() => {
@@ -126,8 +106,11 @@ export default function App() {
                             await yieldForPaint();
                         }
                     }
-                    const indexByPath = patchIndexesFromMeta(renderMeta.byPath);
-                    const stamped = markStaleComments(commentsRef.current, p.files, indexByPath);
+                    const stamped = markStaleComments(
+                        commentsRef.current,
+                        p.files,
+                        renderMeta.byPath,
+                    );
                     setPayload(p);
                     setFileRenderMeta(renderMeta);
                     if (stamped !== commentsRef.current) {
@@ -185,10 +168,6 @@ export default function App() {
 
     const reload = useCallback(() => loadDiff("reload"), [loadDiff]);
 
-    const setOpen = useCallback((path: string, open: boolean) => {
-        setOpenMap((m) => ({ ...m, [path]: open }));
-    }, []);
-
     const expandAll = useCallback(() => {
         if (!payload) return;
         const m: Record<string, boolean> = {};
@@ -203,48 +182,16 @@ export default function App() {
         setOpenMap(m);
     }, [payload]);
 
+    const toggleOpen = useCallback((path: string) => {
+        setOpenMap((m) => ({ ...m, [path]: !(m[path] ?? true) }));
+    }, []);
+
     const scrollToFile = useCallback((path: string) => {
         setOpenMap((m) => (m[path] ? m : { ...m, [path]: true }));
         requestAnimationFrame(() => {
-            const el = document.getElementById(fileCardId(path));
-            el?.scrollIntoView({ behavior: "smooth", block: "start" });
+            codeViewRef.current?.scrollToItem(path);
         });
     }, []);
-
-    useEffect(() => {
-        if (!payload) return;
-        const main = mainRef.current;
-        if (!main) return;
-        const cards = Array.from(main.querySelectorAll<HTMLElement>("[data-file-path]"));
-        if (cards.length === 0) return;
-        let raf = 0;
-        const stickyOffset = main.getBoundingClientRect().top;
-        const compute = () => {
-            raf = 0;
-            let active: string | null = cards[0]?.dataset.filePath ?? null;
-            for (const card of cards) {
-                if (card.getBoundingClientRect().top - stickyOffset <= 1) {
-                    active = card.dataset.filePath ?? active;
-                } else {
-                    break;
-                }
-            }
-            if (active) setActivePath(active);
-        };
-        const schedule = () => {
-            if (raf) return;
-            raf = window.requestAnimationFrame(compute);
-        };
-        schedule();
-        main.addEventListener("scroll", schedule, { passive: true });
-        const ro = new ResizeObserver(schedule);
-        cards.forEach((c) => ro.observe(c));
-        return () => {
-            main.removeEventListener("scroll", schedule);
-            ro.disconnect();
-            if (raf) window.cancelAnimationFrame(raf);
-        };
-    }, [payload]);
 
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
 
@@ -366,56 +313,31 @@ export default function App() {
     const clearScrollTarget = useCallback(() => setScrollToCommentId(null), []);
 
     const jumpToDiffComment = useCallback((id: string) => {
-        let filePath: string | null = null;
+        let target: { filePath: string; comment: DiffComment } | null = null;
         for (const [path, list] of Object.entries(commentsRef.current)) {
-            if (list.some((c) => c.id === id)) {
-                filePath = path;
+            const comment = list.find((c) => c.id === id);
+            if (comment) {
+                target = { filePath: path, comment };
                 break;
             }
         }
-        if (!filePath) return;
-        setOpenMap((m) => (m[filePath!] ? m : { ...m, [filePath!]: true }));
+        if (!target) return;
+        const { filePath, comment } = target;
+        setOpenMap((m) => (m[filePath] ? m : { ...m, [filePath]: true }));
         setDiffFlashCommentId(id);
+        // Two frames so the (possibly just-expanded) item is laid out before
+        // CodeView resolves the line's scroll position.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                codeViewRef.current?.scrollToLine(filePath, comment.lineNumber, comment.side);
+            });
+        });
     }, []);
 
     useEffect(() => {
         if (!diffFlashCommentId) return;
-        const scroller = mainRef.current;
-        if (!scroller) return;
-        let cancelled = false;
-        let attempts = 0;
-        let frames = 0;
-        let velocity = 0;
-        const findEl = () => document.getElementById(commentIndicatorDomId(diffFlashCommentId));
-        // Velocity-smoothed reactive easing. Each frame's target velocity is
-        // proportional to remaining distance; actual velocity is a low-pass-
-        // filtered version, so motion ramps up smoothly at the start, holds
-        // a steady pace, and decelerates gently at the end — instead of
-        // pure exponential decay's snappy start and crawling tail.
-        const animate = () => {
-            if (cancelled || frames++ > 240) return;
-            const el = findEl();
-            if (!el) {
-                if (attempts++ < 60) requestAnimationFrame(animate);
-                return;
-            }
-            const sRect = scroller.getBoundingClientRect();
-            const rect = el.getBoundingClientRect();
-            const offset = rect.top + rect.height / 2 - (sRect.top + sRect.height / 2);
-            const targetVelocity = offset * 0.18;
-            velocity = velocity * 0.78 + targetVelocity * 0.22;
-            if (Math.abs(offset) < 0.5 && Math.abs(velocity) < 0.3) return;
-            scroller.scrollTop += velocity;
-            requestAnimationFrame(animate);
-        };
-        requestAnimationFrame(animate);
-        const t = window.setTimeout(() => {
-            setDiffFlashCommentId(null);
-        }, 3000);
-        return () => {
-            cancelled = true;
-            window.clearTimeout(t);
-        };
+        const t = window.setTimeout(() => setDiffFlashCommentId(null), 3000);
+        return () => window.clearTimeout(t);
     }, [diffFlashCommentId]);
 
     useEffect(() => {
@@ -522,35 +444,26 @@ export default function App() {
                         activePath={activePath}
                         onScrollTo={scrollToFile}
                     />
-                    <main ref={mainRef} className="min-h-0 overflow-y-auto">
-                        <div className="space-y-3 px-5 py-5">
-                            {sortedFiles.map((f) => {
-                                const meta = fileRenderMeta.byPath.get(f.path);
-                                return (
-                                    <FileCard
-                                        key={f.path}
-                                        file={f}
-                                        open={openMap[f.path] ?? true}
-                                        onOpenChange={setOpen}
-                                        viewMode={viewMode}
-                                        wrap={wrap}
-                                        comments={comments[f.path] ?? EMPTY_COMMENTS}
-                                        patchIndex={meta?.patchIndex ?? EMPTY_PATCH_INDEX}
-                                        estimatedHeight={meta?.estimatedHeight ?? 0}
-                                        activeDraft={
-                                            activeDraft?.filePath === f.path ? activeDraft : null
-                                        }
-                                        onRequestDraft={requestDraft}
-                                        onCancelDraft={cancelDraft}
-                                        onSaveDraft={saveDraft}
-                                        onFocusComment={focusComment}
-                                        onEditComment={editComment}
-                                        onDeleteComment={deleteComment}
-                                        flashCommentId={diffFlashCommentId}
-                                    />
-                                );
-                            })}
-                        </div>
+                    <main className="min-h-0 overflow-hidden">
+                        <DiffCodeView
+                            ref={codeViewRef}
+                            files={sortedFiles}
+                            viewMode={viewMode}
+                            wrap={wrap}
+                            comments={comments}
+                            openMap={openMap}
+                            patchIndexByPath={fileRenderMeta.byPath}
+                            activeDraft={activeDraft}
+                            onToggleOpen={toggleOpen}
+                            onRequestDraft={requestDraft}
+                            onCancelDraft={cancelDraft}
+                            onSaveDraft={saveDraft}
+                            onFocusComment={focusComment}
+                            onEditComment={editComment}
+                            onDeleteComment={deleteComment}
+                            flashCommentId={diffFlashCommentId}
+                            onActivePathChange={setActivePath}
+                        />
                     </main>
                     <div className="h-full overflow-hidden">
                         <CommentsSidebar

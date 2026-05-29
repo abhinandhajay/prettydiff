@@ -1,4 +1,3 @@
-import { fileCardId } from "@/lib/slug";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import { ArrowUpToLine } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
@@ -160,13 +159,11 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
                     {files.length} file{files.length === 1 ? "" : "s"}
                 </span>
                 <button
+                    type="button"
                     className="hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
                     onClick={() => {
                         const first = files[0];
-                        if (first) {
-                            const card = document.getElementById(fileCardId(first.path));
-                            card?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        }
+                        if (first) onScrollTo(first.path);
                     }}
                 >
                     <ArrowUpToLine className="size-3" />
