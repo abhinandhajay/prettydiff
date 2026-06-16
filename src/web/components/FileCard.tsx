@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { commentKey, commentsByKey } from "@/lib/comments";
 import { fileCardId } from "@/lib/slug";
 import { cn } from "@/lib/utils";
-import { PatchDiff } from "@pierre/diffs/react";
+import { MultiFileDiff } from "@pierre/diffs/react";
 import {
     ArrowRight,
     ChevronDown,
@@ -117,20 +117,22 @@ function deriveLineType(
     side: CommentSide,
     lineNumber: number,
 ): { lineType: CommentLineType; lineText: string } | null {
-    const additionText = index.additions.get(lineNumber);
-    const deletionText = index.deletions.get(lineNumber);
     if (side === "additions") {
-        if (additionText === undefined) return null;
-        if (deletionText !== undefined && deletionText === additionText) {
-            return { lineType: "context", lineText: additionText };
+        const text = index.additions.get(lineNumber);
+        if (text === undefined) return null;
+        if (index.changedAdditions.has(lineNumber)) {
+            return { lineType: "change-addition", lineText: text };
         }
-        return { lineType: "change-addition", lineText: additionText };
+        const lineType = index.patchAdditions.has(lineNumber) ? "context" : "context-expanded";
+        return { lineType, lineText: text };
     }
-    if (deletionText === undefined) return null;
-    if (additionText !== undefined && additionText === deletionText) {
-        return { lineType: "context", lineText: deletionText };
+    const text = index.deletions.get(lineNumber);
+    if (text === undefined) return null;
+    if (index.changedDeletions.has(lineNumber)) {
+        return { lineType: "change-deletion", lineText: text };
     }
-    return { lineType: "change-deletion", lineText: deletionText };
+    const lineType = index.patchDeletions.has(lineNumber) ? "context" : "context-expanded";
+    return { lineType, lineText: text };
 }
 
 function FileCardImpl({
@@ -220,10 +222,21 @@ function FileCardImpl({
             disableFileHeader: true,
             overflow: (wrap ? "wrap" : "scroll") as "wrap" | "scroll",
             enableGutterUtility: true,
+            collapsedContextThreshold: 20,
+            expansionLineCount: 20,
             onLineEnter: handleLineEnter,
             onLineLeave: handleLineLeave,
         }),
         [viewMode, wrap, handleLineEnter, handleLineLeave],
+    );
+
+    const oldFile = useMemo(
+        () => ({ name: file.oldPath ?? file.path, contents: file.oldContents ?? "" }),
+        [file.oldPath, file.path, file.oldContents],
+    );
+    const newFile = useMemo(
+        () => ({ name: file.path, contents: file.newContents ?? "" }),
+        [file.path, file.newContents],
     );
 
     const hoverOccupied = useMemo(() => {
@@ -318,8 +331,9 @@ function FileCardImpl({
                                 >
                                     <LazyDiffBody estimatedHeight={estimatedHeight}>
                                         <div className="bg-background/40 overflow-x-auto">
-                                            <PatchDiff<AnnotationMeta>
-                                                patch={file.rawPatch}
+                                            <MultiFileDiff<AnnotationMeta>
+                                                oldFile={oldFile}
+                                                newFile={newFile}
                                                 options={diffOptions}
                                                 lineAnnotations={lineAnnotations}
                                                 renderAnnotation={(a) => {

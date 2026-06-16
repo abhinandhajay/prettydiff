@@ -7,6 +7,8 @@ export interface ParsedFile {
     additions: number;
     deletions: number;
     rawPatch: string;
+    oldContents?: string;
+    newContents?: string;
     binary?: boolean;
     skipped?: { reason: "binary" | "too-large" | "no-hunks"; sizeBytes?: number };
 }

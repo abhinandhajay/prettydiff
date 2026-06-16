@@ -6,7 +6,7 @@ import { FileTreeSidebar } from "@/components/FileTreeSidebar";
 import { Header } from "@/components/Header";
 import {
     allCommentIds,
-    buildPatchIndex,
+    buildFileIndex,
     commentKey,
     formatCommentsForCopy,
     markStaleComments,
@@ -23,7 +23,14 @@ import type { PatchLineIndex } from "@/lib/comments";
 import type { CommentMap, DiffComment, DiffPayload, DraftLine, ParsedFile } from "@/lib/types";
 
 const EMPTY_COMMENTS: DiffComment[] = [];
-const EMPTY_PATCH_INDEX: PatchLineIndex = { additions: new Map(), deletions: new Map() };
+const EMPTY_PATCH_INDEX: PatchLineIndex = {
+    additions: new Map(),
+    deletions: new Map(),
+    changedAdditions: new Set(),
+    changedDeletions: new Set(),
+    patchAdditions: new Set(),
+    patchDeletions: new Set(),
+};
 const HUGE_DIFF_LINE_THRESHOLD = 5000;
 const ESTIMATED_DIFF_HEADER_HEIGHT = 56;
 const ESTIMATED_DIFF_LINE_HEIGHT = 18;
@@ -58,7 +65,7 @@ function buildRenderMeta(files: ParsedFile[]): DiffRenderMeta {
         totalLines += lineCount;
         byPath.set(file.path, {
             estimatedHeight: ESTIMATED_DIFF_HEADER_HEIGHT + lineCount * ESTIMATED_DIFF_LINE_HEIGHT,
-            patchIndex: buildPatchIndex(file.rawPatch),
+            patchIndex: buildFileIndex(file),
         });
     }
     return { byPath, totalLines };
