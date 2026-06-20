@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { lstat, readFile, readlink, stat } from "node:fs/promises";
 import path from "node:path";
 
 import parseDiffLib from "parse-diff";
@@ -92,7 +92,11 @@ async function getFileAtHead(cwd: string, relPath: string): Promise<string | nul
 
 async function readWorkingTreeFile(cwd: string, relPath: string): Promise<string | null> {
     try {
-        return await readFile(path.join(cwd, relPath), "utf8");
+        const filePath = path.join(cwd, relPath);
+        const fileStat = await lstat(filePath);
+        return fileStat.isSymbolicLink()
+            ? await readlink(filePath, "utf8")
+            : await readFile(filePath, "utf8");
     } catch {
         return null;
     }
