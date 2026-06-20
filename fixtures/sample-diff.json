@@ -132,8 +132,8 @@
             "additions": 2,
             "deletions": 2,
             "rawPatch": "diff --git a/test/force-render-error.ts b/test/force-render-error.ts\nindex 1111111..2222222 100644\n--- a/test/force-render-error.ts\n+++ b/test/force-render-error.ts\n@@ -1,3 +1,3 @@\n line1\n-line2\n+line2-changed\n line3\ndiff --git a/test/force-render-error.ts b/test/force-render-error.ts\nindex 1111111..2222222 100644\n--- a/test/force-render-error.ts\n+++ b/test/force-render-error.ts\n@@ -10,3 +10,3 @@\n lineA\n-lineB\n+lineB-changed\n lineC\n",
-            "oldContents": "line1\nline2\nline3\n-- a/test/force-render-error.ts\n// …\n// …\n// …\n// …\n// …\nlineA\nlineB\nlineC\n",
-            "newContents": "line1\nline2-changed\nline3\n++ b/test/force-render-error.ts\n// …\n// …\n// …\n// …\n// …\nlineA\nlineB-changed\nlineC\n"
+            "oldContents": "line1\nline2\nline3\n// …\n// …\n// …\n// …\n// …\n// …\nlineA\nlineB\nlineC\n",
+            "newContents": "line1\nline2-changed\nline3\n// …\n// …\n// …\n// …\n// …\n// …\nlineA\nlineB-changed\nlineC\n"
         },
         {
             "path": "notes.todo",
@@ -151,7 +151,9 @@
             "deletions": 0,
             "binary": true,
             "rawPatch": "",
-            "skipped": { "reason": "binary" }
+            "skipped": {
+                "reason": "binary"
+            }
         },
         {
             "path": "data/dump.csv",
