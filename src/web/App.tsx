@@ -210,13 +210,48 @@ export default function App() {
         setOpenMap(m);
     }, [payload]);
 
+    const fileScrollCancelRef = useRef<(() => void) | null>(null);
     const scrollToFile = useCallback((path: string) => {
         setOpenMap((m) => (m[path] ? m : { ...m, [path]: true }));
-        requestAnimationFrame(() => {
+        const scroller = mainRef.current;
+        if (!scroller) return;
+        // Cancel any in-flight file scroll so rapid clicks don't fight.
+        fileScrollCancelRef.current?.();
+        let cancelled = false;
+        fileScrollCancelRef.current = () => {
+            cancelled = true;
+        };
+        // Re-measure every frame and drive the card's top to the scroller's top.
+        // The cards use content-visibility, so off-screen intrinsic heights are
+        // only estimates until a card renders — a one-shot scrollIntoView lands
+        // off when those estimates differ from the real diff height. Re-targeting
+        // each frame converges to the exact position regardless. Same velocity-
+        // smoothed easing as the comment jump below.
+        let frames = 0;
+        let settle = 0;
+        let velocity = 0;
+        const animate = () => {
+            if (cancelled || frames++ > 240) return;
             const el = document.getElementById(fileCardId(path));
-            el?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
+            if (!el) {
+                if (frames < 60) requestAnimationFrame(animate);
+                return;
+            }
+            const offset = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+            if (Math.abs(offset) < 0.5 && Math.abs(velocity) < 0.3) {
+                if (++settle > 3) return;
+            } else {
+                settle = 0;
+            }
+            const targetVelocity = offset * 0.18;
+            velocity = velocity * 0.78 + targetVelocity * 0.22;
+            scroller.scrollTop += velocity;
+            requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
     }, []);
+
+    useEffect(() => () => fileScrollCancelRef.current?.(), []);
 
     useEffect(() => {
         if (!payload) return;
