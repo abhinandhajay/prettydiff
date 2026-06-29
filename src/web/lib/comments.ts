@@ -26,11 +26,28 @@ export function commentsByKey(comments: DiffComment[]): Map<string, DiffComment[
 export interface PatchLineIndex {
     additions: Map<number, string>;
     deletions: Map<number, string>;
+    /** New-file line numbers that are genuine additions (`+` in the patch). */
+    changedAdditions: Set<number>;
+    /** Old-file line numbers that are genuine deletions (`-` in the patch). */
+    changedDeletions: Set<number>;
+    /** New-file line numbers present in the original patch (changes + context). */
+    patchAdditions: Set<number>;
+    /** Old-file line numbers present in the original patch (changes + context). */
+    patchDeletions: Set<number>;
 }
 
-export function buildPatchIndex(rawPatch: string): PatchLineIndex {
+interface PatchScan {
+    additions: Map<number, string>;
+    deletions: Map<number, string>;
+    changedAdditions: Set<number>;
+    changedDeletions: Set<number>;
+}
+
+function scanPatch(rawPatch: string): PatchScan {
     const additions = new Map<number, string>();
     const deletions = new Map<number, string>();
+    const changedAdditions = new Set<number>();
+    const changedDeletions = new Set<number>();
     let addLine = 0;
     let delLine = 0;
     let inHunk = false;
@@ -51,9 +68,11 @@ export function buildPatchIndex(rawPatch: string): PatchLineIndex {
         const text = raw.slice(1);
         if (prefix === "+") {
             additions.set(addLine, text);
+            changedAdditions.add(addLine);
             addLine += 1;
         } else if (prefix === "-") {
             deletions.set(delLine, text);
+            changedDeletions.add(delLine);
             delLine += 1;
         } else if (prefix === " ") {
             additions.set(addLine, text);
@@ -62,7 +81,43 @@ export function buildPatchIndex(rawPatch: string): PatchLineIndex {
             delLine += 1;
         }
     }
-    return { additions, deletions };
+    return { additions, deletions, changedAdditions, changedDeletions };
+}
+
+function splitFileLines(contents: string): string[] {
+    const lines = contents.split("\n");
+    // A trailing newline yields a spurious empty final element — drop it so the
+    // line count matches the file's actual lines.
+    if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+    return lines;
+}
+
+/**
+ * Index built from the full file contents so comments can attach to any visible line — including
+ * context revealed by expansion, which never appears in the patch. The patch is still scanned to
+ * mark which lines are genuine changes vs context (and which context lines were inside the original
+ * hunks).
+ */
+function buildContentsIndex(file: ParsedFile): PatchLineIndex {
+    const scan = scanPatch(file.rawPatch);
+    const additions = new Map<number, string>();
+    const deletions = new Map<number, string>();
+
+    splitFileLines(file.newContents ?? "").forEach((text, i) => additions.set(i + 1, text));
+    splitFileLines(file.oldContents ?? "").forEach((text, i) => deletions.set(i + 1, text));
+
+    return {
+        additions,
+        deletions,
+        changedAdditions: scan.changedAdditions,
+        changedDeletions: scan.changedDeletions,
+        patchAdditions: new Set(scan.additions.keys()),
+        patchDeletions: new Set(scan.deletions.keys()),
+    };
+}
+
+export function buildFileIndex(file: ParsedFile): PatchLineIndex {
+    return buildContentsIndex(file);
 }
 
 export function markStaleComments(
@@ -86,7 +141,7 @@ export function markStaleComments(
             next[path] = listChanged ? updated : list;
             continue;
         }
-        const idx = indexByPath?.get(path) ?? buildPatchIndex(file.rawPatch);
+        const idx = indexByPath?.get(path) ?? buildFileIndex(file);
         let listChanged = false;
         const updated = list.map((c) => {
             const map = c.side === "additions" ? idx.additions : idx.deletions;

@@ -9,7 +9,7 @@ interface State {
     hasError: boolean;
 }
 
-export class PatchErrorBoundary extends Component<Props, State> {
+export class DiffErrorBoundary extends Component<Props, State> {
     state: State = { hasError: false };
 
     static getDerivedStateFromError(): State {
@@ -17,7 +17,7 @@ export class PatchErrorBoundary extends Component<Props, State> {
     }
 
     componentDidCatch(error: unknown) {
-        console.error("PatchDiff failed to render:", error);
+        console.error("Diff renderer failed to render:", error);
     }
 
     render() {

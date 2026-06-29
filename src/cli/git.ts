@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { stat } from "node:fs/promises";
+import { lstat, readFile, readlink, stat } from "node:fs/promises";
 import path from "node:path";
 
 import parseDiffLib from "parse-diff";
@@ -8,6 +8,7 @@ import type { DiffPayload, ParsedFile, FileStatus } from "./types.js";
 
 const NULL_DEVICE = process.platform === "win32" ? "NUL" : "/dev/null";
 const MAX_UNTRACKED_BYTES = 512 * 1024;
+const MAX_CONTENT_BYTES = 512 * 1024;
 
 interface RunResult {
     stdout: string;
@@ -77,6 +78,54 @@ async function getTrackedDiff(cwd: string): Promise<string> {
         cwd,
     );
     return r.stdout;
+}
+
+async function getFileAtHead(cwd: string, relPath: string): Promise<string | null> {
+    try {
+        // exit 128 means the path doesn't exist at HEAD (e.g. an added file).
+        const r = await run("git", ["show", `HEAD:${relPath}`], cwd, [0, 128]);
+        return r.code === 0 ? r.stdout : null;
+    } catch {
+        return null;
+    }
+}
+
+async function readWorkingTreeFile(cwd: string, relPath: string): Promise<string | null> {
+    try {
+        const filePath = path.join(cwd, relPath);
+        const fileStat = await lstat(filePath);
+        return fileStat.isSymbolicLink()
+            ? await readlink(filePath, "utf8")
+            : await readFile(filePath, "utf8");
+    } catch {
+        return null;
+    }
+}
+
+interface FileSides {
+    oldContents: string;
+    newContents: string;
+    sizeBytes: number;
+}
+
+async function loadFileSides(cwd: string, file: ParsedFile): Promise<FileSides | "too-large"> {
+    const oldRef = file.oldPath ?? file.path;
+    const needsOld = file.status !== "added" && file.status !== "untracked";
+    const needsNew = file.status !== "deleted";
+
+    const [oldRaw, newRaw] = await Promise.all([
+        needsOld ? getFileAtHead(cwd, oldRef) : Promise.resolve(""),
+        needsNew ? readWorkingTreeFile(cwd, file.path) : Promise.resolve(""),
+    ]);
+
+    const oldContents = oldRaw ?? "";
+    const newContents = newRaw ?? "";
+    const sizeBytes = Math.max(
+        Buffer.byteLength(oldContents, "utf8"),
+        Buffer.byteLength(newContents, "utf8"),
+    );
+    if (sizeBytes > MAX_CONTENT_BYTES) return "too-large";
+    return { oldContents, newContents, sizeBytes };
 }
 
 async function getUntrackedFiles(cwd: string): Promise<string[]> {
@@ -214,6 +263,20 @@ export async function getDiffPayload(cwd: string): Promise<DiffPayload | null> {
             });
         }
     }
+
+    await Promise.all(
+        files.map(async (file) => {
+            if (file.skipped || file.binary) return;
+            const sides = await loadFileSides(repoRoot, file);
+            if (sides === "too-large") {
+                file.rawPatch = "";
+                file.skipped = { reason: "too-large" };
+                return;
+            }
+            file.oldContents = sides.oldContents;
+            file.newContents = sides.newContents;
+        }),
+    );
 
     return {
         repoRoot,

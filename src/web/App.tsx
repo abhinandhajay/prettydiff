@@ -6,7 +6,7 @@ import { FileTreeSidebar } from "@/components/FileTreeSidebar";
 import { Header } from "@/components/Header";
 import {
     allCommentIds,
-    buildPatchIndex,
+    buildFileIndex,
     commentKey,
     formatCommentsForCopy,
     markStaleComments,
@@ -23,7 +23,14 @@ import type { PatchLineIndex } from "@/lib/comments";
 import type { CommentMap, DiffComment, DiffPayload, DraftLine, ParsedFile } from "@/lib/types";
 
 const EMPTY_COMMENTS: DiffComment[] = [];
-const EMPTY_PATCH_INDEX: PatchLineIndex = { additions: new Map(), deletions: new Map() };
+const EMPTY_PATCH_INDEX: PatchLineIndex = {
+    additions: new Map(),
+    deletions: new Map(),
+    changedAdditions: new Set(),
+    changedDeletions: new Set(),
+    patchAdditions: new Set(),
+    patchDeletions: new Set(),
+};
 const HUGE_DIFF_LINE_THRESHOLD = 5000;
 const ESTIMATED_DIFF_HEADER_HEIGHT = 56;
 const ESTIMATED_DIFF_LINE_HEIGHT = 18;
@@ -58,7 +65,7 @@ function buildRenderMeta(files: ParsedFile[]): DiffRenderMeta {
         totalLines += lineCount;
         byPath.set(file.path, {
             estimatedHeight: ESTIMATED_DIFF_HEADER_HEIGHT + lineCount * ESTIMATED_DIFF_LINE_HEIGHT,
-            patchIndex: buildPatchIndex(file.rawPatch),
+            patchIndex: buildFileIndex(file),
         });
     }
     return { byPath, totalLines };
@@ -203,13 +210,48 @@ export default function App() {
         setOpenMap(m);
     }, [payload]);
 
+    const fileScrollCancelRef = useRef<(() => void) | null>(null);
     const scrollToFile = useCallback((path: string) => {
         setOpenMap((m) => (m[path] ? m : { ...m, [path]: true }));
-        requestAnimationFrame(() => {
+        const scroller = mainRef.current;
+        if (!scroller) return;
+        // Cancel any in-flight file scroll so rapid clicks don't fight.
+        fileScrollCancelRef.current?.();
+        let cancelled = false;
+        fileScrollCancelRef.current = () => {
+            cancelled = true;
+        };
+        // Re-measure every frame and drive the card's top to the scroller's top.
+        // The cards use content-visibility, so off-screen intrinsic heights are
+        // only estimates until a card renders — a one-shot scrollIntoView lands
+        // off when those estimates differ from the real diff height. Re-targeting
+        // each frame converges to the exact position regardless. Same velocity-
+        // smoothed easing as the comment jump below.
+        let frames = 0;
+        let settle = 0;
+        let velocity = 0;
+        const animate = () => {
+            if (cancelled || frames++ > 240) return;
             const el = document.getElementById(fileCardId(path));
-            el?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
+            if (!el) {
+                if (frames < 60) requestAnimationFrame(animate);
+                return;
+            }
+            const offset = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+            if (Math.abs(offset) < 0.5 && Math.abs(velocity) < 0.3) {
+                if (++settle > 3) return;
+            } else {
+                settle = 0;
+            }
+            const targetVelocity = offset * 0.18;
+            velocity = velocity * 0.78 + targetVelocity * 0.22;
+            scroller.scrollTop += velocity;
+            requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
     }, []);
+
+    useEffect(() => () => fileScrollCancelRef.current?.(), []);
 
     useEffect(() => {
         if (!payload) return;
