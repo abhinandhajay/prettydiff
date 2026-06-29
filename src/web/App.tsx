@@ -34,6 +34,8 @@ const EMPTY_PATCH_INDEX: PatchLineIndex = {
 const HUGE_DIFF_LINE_THRESHOLD = 5000;
 const ESTIMATED_DIFF_HEADER_HEIGHT = 56;
 const ESTIMATED_DIFF_LINE_HEIGHT = 18;
+// The comments sidebar floats in an overlay sized to match the grid track it reserves.
+const COMMENTS_SIDEBAR_WIDTH = "min(340px, 28vw)";
 
 interface DiffFileRenderMeta {
     estimatedHeight: number;
@@ -290,6 +292,11 @@ export default function App() {
 
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
 
+    const allExpanded = useMemo(
+        () => (payload ? payload.files.every((f) => openMap[f.path] ?? true) : true),
+        [payload, openMap],
+    );
+
     const totalCommentCount = useMemo(
         () => Object.values(comments).reduce((n, list) => n + list.length, 0),
         [comments],
@@ -544,6 +551,7 @@ export default function App() {
                 onWrapChange={setWrap}
                 onExpandAll={expandAll}
                 onCollapseAll={collapseAll}
+                allExpanded={allExpanded}
                 onReload={reload}
                 isReloading={isReloading}
                 showComments={showCommentsSidebar}
@@ -554,9 +562,11 @@ export default function App() {
                 <EmptyState kind="empty" title="No changes" message="Working tree matches HEAD." />
             ) : (
                 <div
-                    className="grid min-h-0 flex-1 transition-[grid-template-columns] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                    className="relative grid min-h-0 flex-1 overflow-hidden"
                     style={{
-                        gridTemplateColumns: `276px 1fr ${showCommentsSidebar ? "340px" : "0px"}`,
+                        gridTemplateColumns: `minmax(0, min(276px, 24vw)) minmax(0, 1fr) ${
+                            showCommentsSidebar ? COMMENTS_SIDEBAR_WIDTH : "0px"
+                        }`,
                     }}
                 >
                     <FileTreeSidebar
@@ -564,8 +574,8 @@ export default function App() {
                         activePath={activePath}
                         onScrollTo={scrollToFile}
                     />
-                    <main ref={mainRef} className="min-h-0 overflow-y-auto">
-                        <div className="space-y-3 px-5 py-5">
+                    <main ref={mainRef} className="bg-card min-h-0 overflow-y-auto">
+                        <div>
                             {sortedFiles.map((f) => {
                                 const meta = fileRenderMeta.byPath.get(f.path);
                                 return (
@@ -594,7 +604,10 @@ export default function App() {
                             })}
                         </div>
                     </main>
-                    <div className="h-full overflow-hidden">
+                    <div
+                        className="pointer-events-none absolute inset-y-0 right-0 z-10 overflow-hidden"
+                        style={{ width: COMMENTS_SIDEBAR_WIDTH }}
+                    >
                         <CommentsSidebar
                             open={showCommentsSidebar}
                             comments={comments}

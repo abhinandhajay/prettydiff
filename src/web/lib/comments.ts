@@ -1,6 +1,24 @@
 import { repoBasename } from "@/lib/format";
 
-import type { CommentMap, CommentSide, DiffComment, DiffPayload, ParsedFile } from "@/lib/types";
+import type {
+    CommentLineType,
+    CommentMap,
+    CommentSide,
+    DiffComment,
+    DiffPayload,
+    ParsedFile,
+} from "@/lib/types";
+
+/** Rail + glyph color keyed to the commented line, mirroring the diff's change bars. */
+export const lineTypeAccent: Record<CommentLineType, { rail: string; text: string }> = {
+    "change-addition": {
+        rail: "bg-emerald-500/70",
+        text: "text-emerald-600 dark:text-emerald-400",
+    },
+    "change-deletion": { rail: "bg-rose-500/70", text: "text-rose-600 dark:text-rose-400" },
+    context: { rail: "bg-muted-foreground/30", text: "text-muted-foreground" },
+    "context-expanded": { rail: "bg-muted-foreground/30", text: "text-muted-foreground" },
+};
 
 export interface CommentLocation {
     filePath: string;

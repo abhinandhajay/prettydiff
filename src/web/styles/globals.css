@@ -3,103 +3,97 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * prettydiff — terminal-grade refinement
- * Deep cool near-black, amber/honey accent, hairline borders.
- */
-
 :root {
     --radius: 0.5rem;
 
-    /* Surfaces — light mode (rarely used; dark is default) */
-    --background: oklch(0.985 0.002 90);
-    --foreground: oklch(0.18 0.012 270);
+    --background: oklch(0.972 0.002 260);
+    --foreground: oklch(0.17 0.006 260);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.18 0.012 270);
+    --card-foreground: oklch(0.17 0.006 260);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.18 0.012 270);
+    --popover-foreground: oklch(0.17 0.006 260);
 
-    /* Pierre @pierre/trees modified-file blue (light) */
-    --primary: oklch(0.56 0.085 210);
-    --primary-foreground: oklch(0.99 0.005 90);
-    --secondary: oklch(0.95 0.005 90);
-    --secondary-foreground: oklch(0.22 0.012 270);
-    --muted: oklch(0.95 0.005 90);
-    --muted-foreground: oklch(0.5 0.012 270);
-    --accent: oklch(0.56 0.085 210);
-    --accent-foreground: oklch(0.99 0.005 90);
+    --primary: oklch(0.52 0.004 260);
+    --primary-foreground: oklch(0.985 0.001 260);
+    --secondary: oklch(0.945 0.002 260);
+    --secondary-foreground: oklch(0.24 0.006 260);
+    --muted: oklch(0.945 0.002 260);
+    --muted-foreground: oklch(0.48 0.006 260);
+    --accent: oklch(0.925 0.002 260);
+    --accent-foreground: oklch(0.985 0.001 260);
     --destructive: oklch(0.62 0.21 22);
     --destructive-foreground: oklch(0.985 0 0);
 
-    --border: oklch(0.9 0.005 90);
-    --input: oklch(0.9 0.005 90);
-    --ring: oklch(0.56 0.085 210);
+    --border: oklch(0.905 0.003 260);
+    --input: oklch(0.9 0.003 260);
+    --ring: oklch(0.52 0.004 260);
 
     --success: oklch(0.65 0.15 145);
     --warning: oklch(0.78 0.13 75);
     --addition: oklch(0.55 0.13 145);
     --deletion: oklch(0.55 0.18 22);
 
-    --sidebar: oklch(0.97 0.003 90);
-    --sidebar-foreground: oklch(0.22 0.012 270);
-    --sidebar-primary: oklch(0.56 0.085 210);
-    --sidebar-primary-foreground: oklch(0.99 0.005 90);
-    --sidebar-accent: oklch(0.94 0.005 90);
-    --sidebar-accent-foreground: oklch(0.22 0.012 270);
-    --sidebar-border: oklch(0.9 0.005 90);
-    --sidebar-ring: oklch(0.56 0.085 210);
+    --sidebar: oklch(0.958 0.002 260);
+    --sidebar-foreground: oklch(0.22 0.006 260);
+    --sidebar-primary: oklch(0.52 0.004 260);
+    --sidebar-primary-foreground: oklch(0.985 0.001 260);
+    --sidebar-accent: oklch(0.925 0.002 260);
+    --sidebar-accent-foreground: oklch(0.22 0.006 260);
+    --sidebar-border: oklch(0.905 0.003 260);
+    --sidebar-ring: oklch(0.52 0.004 260);
+
+    /* Keep the diff body's neutral surface flush with the card it sits in. */
+    --diffs-bg-buffer-override: var(--card);
+    --diffs-bg-context-override: var(--card);
+    --diffs-bg-context-gutter-override: var(--card);
+    --diffs-bg-separator-override: var(--card);
 }
 
 .dark {
-    /* Deep cool near-black with subtle blue undertone */
-    --background: oklch(0.155 0.008 260);
-    --foreground: oklch(0.96 0.005 90);
+    --background: oklch(0.165 0.004 260);
+    --foreground: oklch(0.93 0.003 260);
 
-    --card: oklch(0.185 0.009 260);
-    --card-foreground: oklch(0.96 0.005 90);
-    --popover: oklch(0.205 0.01 260);
-    --popover-foreground: oklch(0.96 0.005 90);
+    --card: oklch(0.218 0.004 260);
+    --card-foreground: oklch(0.93 0.003 260);
+    --popover: oklch(0.235 0.004 260);
+    --popover-foreground: oklch(0.93 0.003 260);
 
-    /* Pierre @pierre/trees modified-file blue (dark) */
-    --primary: oklch(0.61 0.12 210);
-    --primary-foreground: oklch(0.155 0.008 260);
+    --primary: oklch(0.72 0.006 260);
+    --primary-foreground: oklch(0.16 0.004 260);
 
-    --secondary: oklch(0.235 0.01 260);
-    --secondary-foreground: oklch(0.96 0.005 90);
-    --muted: oklch(0.225 0.009 260);
-    --muted-foreground: oklch(0.66 0.012 250);
+    --secondary: oklch(0.255 0.004 260);
+    --secondary-foreground: oklch(0.92 0.003 260);
+    --muted: oklch(0.245 0.004 260);
+    --muted-foreground: oklch(0.69 0.004 260);
 
-    --accent: oklch(0.61 0.12 210);
-    --accent-foreground: oklch(0.155 0.008 260);
+    --accent: oklch(0.285 0.004 260);
+    --accent-foreground: oklch(0.93 0.003 260);
 
     --destructive: oklch(0.7 0.2 22);
-    --destructive-foreground: oklch(0.98 0.005 90);
+    --destructive-foreground: oklch(0.98 0.003 260);
 
-    /* Hairline borders */
-    --border: oklch(1 0 0 / 8%);
-    --input: oklch(1 0 0 / 12%);
-    --ring: oklch(0.78 0.09 220 / 60%);
+    --border: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.74 0.006 260 / 60%);
 
     --success: oklch(0.74 0.16 148);
     --warning: oklch(0.82 0.135 78);
     --addition: oklch(0.74 0.16 148);
     --deletion: oklch(0.7 0.2 22);
 
-    --sidebar: oklch(0.135 0.008 260);
-    --sidebar-foreground: oklch(0.92 0.005 90);
-    --sidebar-primary: oklch(0.61 0.12 210);
-    --sidebar-primary-foreground: oklch(0.155 0.008 260);
-    --sidebar-accent: oklch(0.21 0.009 260);
-    --sidebar-accent-foreground: oklch(0.96 0.005 90);
-    --sidebar-border: oklch(1 0 0 / 6%);
-    --sidebar-ring: oklch(0.78 0.09 220 / 60%);
+    --sidebar: oklch(0.155 0.004 260);
+    --sidebar-foreground: oklch(0.88 0.003 260);
+    --sidebar-primary: oklch(0.72 0.006 260);
+    --sidebar-primary-foreground: oklch(0.16 0.004 260);
+    --sidebar-accent: oklch(0.235 0.004 260);
+    --sidebar-accent-foreground: oklch(0.93 0.003 260);
+    --sidebar-border: oklch(1 0 0 / 11%);
+    --sidebar-ring: oklch(0.74 0.006 260 / 60%);
 
-    /* @pierre/diffs: lift the diff surfaces from pure #000 to --background so inline
-       comments (on --card) sit one tier above the diff stream. */
-    --diffs-bg-buffer-override: var(--background);
-    --diffs-bg-context-override: var(--background);
-    --diffs-bg-context-gutter-override: var(--background);
-    --diffs-bg-separator-override: var(--background);
+    --diffs-bg-buffer-override: var(--card);
+    --diffs-bg-context-override: var(--card);
+    --diffs-bg-context-gutter-override: var(--card);
+    --diffs-bg-separator-override: var(--card);
 }
 
 @theme inline {
@@ -171,19 +165,6 @@
     .tabular-nums {
         font-variant-numeric: tabular-nums;
     }
-}
-
-/* Ambient backdrop — radial glow blended on top so it tints every surface, including the sidebars */
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 40;
-    mix-blend-mode: screen;
-    background:
-        radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.78 0.09 220 / 0.07), transparent 60%),
-        radial-gradient(ellipse 80% 50% at 0% 100%, oklch(0.55 0.065 250 / 0.08), transparent 60%);
 }
 
 /* Thin scrollbar, themed */

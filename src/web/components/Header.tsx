@@ -7,11 +7,11 @@ import {
     ChevronsDownUp,
     ChevronsUpDown,
     GitBranch,
+    GitCommitHorizontal,
     MessageSquare,
     RefreshCw,
     WrapText,
 } from "lucide-react";
-import { useMemo } from "react";
 
 import type { DiffPayload } from "@/lib/types";
 
@@ -23,6 +23,7 @@ interface Props {
     onWrapChange: (w: boolean) => void;
     onExpandAll: () => void;
     onCollapseAll: () => void;
+    allExpanded: boolean;
     onReload: () => void;
     isReloading: boolean;
     showComments: boolean;
@@ -52,27 +53,8 @@ function LogoMark({ className }: { className?: string }) {
     );
 }
 
-/** Mini horizontal ratio bar for additions vs deletions. */
-function RatioBar({ add, del }: { add: number; del: number }) {
-    const total = add + del;
-    const addPct = total === 0 ? 0 : (add / total) * 100;
-    const delPct = total === 0 ? 0 : (del / total) * 100;
-    return (
-        <div
-            className="bg-border/60 relative h-[5px] w-20 overflow-hidden rounded-full"
-            aria-hidden
-        >
-            <div
-                className="h-full bg-emerald-500/80"
-                style={{ width: `${addPct}%`, float: "left" }}
-            />
-            <div className="h-full bg-rose-500/80" style={{ width: `${delPct}%`, float: "left" }} />
-        </div>
-    );
-}
-
 function Divider() {
-    return <span aria-hidden className="bg-border/70 h-4 w-px shrink-0" />;
+    return <span aria-hidden className="bg-border/80 h-4 w-px shrink-0" />;
 }
 
 export function Header({
@@ -83,85 +65,59 @@ export function Header({
     onWrapChange,
     onExpandAll,
     onCollapseAll,
+    allExpanded,
     onReload,
     isReloading,
     showComments,
     onShowCommentsChange,
     commentCount,
 }: Props) {
-    const totals = useMemo(
-        () =>
-            payload.files.reduce(
-                (acc, f) => {
-                    acc.add += f.additions;
-                    acc.del += f.deletions;
-                    return acc;
-                },
-                { add: 0, del: 0 },
-            ),
-        [payload.files],
-    );
-
     return (
-        <header className="bg-background/70 supports-[backdrop-filter]:bg-background/55 isolate z-20 flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4 backdrop-blur-xl">
+        <header className="bg-background isolate z-20 flex h-12 shrink-0 items-center justify-between gap-3 border-b px-3">
             <div className="flex min-w-0 items-center gap-3">
                 <div className="flex items-center gap-2">
-                    <span className="text-primary bg-primary/10 ring-primary/25 inline-flex size-7 items-center justify-center rounded-md ring-1">
+                    <span className="text-muted-foreground bg-card border-border inline-flex size-7 items-center justify-center rounded-md border">
                         <LogoMark className="size-4" />
                     </span>
-                    <span className="text-foreground text-[15px] font-semibold tracking-tight">
+                    <span className="text-foreground text-[14px] font-semibold tracking-tight">
                         prettydiff
                     </span>
                 </div>
                 <Divider />
-                <div className="text-muted-foreground hidden min-w-0 items-center gap-2.5 text-[13px] md:flex">
+                <div className="hidden min-w-0 items-center gap-2 md:flex">
                     <span
-                        className="text-foreground/85 truncate font-medium"
+                        className="text-foreground/85 truncate text-[13px] font-medium"
                         title={payload.repoRoot}
                     >
                         {repoBasename(payload.repoRoot)}
                     </span>
-                    <span className="border-border/70 bg-muted/40 text-foreground/85 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[11px]">
-                        <GitBranch className="size-3" />
-                        {payload.branch}
+                    <span
+                        className="text-foreground/80 bg-muted/60 inline-flex max-w-[180px] items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[11.5px]"
+                        title={`Branch: ${payload.branch}`}
+                    >
+                        <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
+                        <span className="truncate">{payload.branch}</span>
                     </span>
                     {payload.head ? (
-                        <span className="text-muted-foreground/80 font-mono text-[11px]">
+                        <span
+                            className="text-muted-foreground inline-flex items-center gap-1 font-mono text-[11.5px]"
+                            title={`Commit: ${payload.head}`}
+                        >
+                            <GitCommitHorizontal className="size-3.5 shrink-0" />
                             {payload.head.slice(0, 7)}
                         </span>
                     ) : null}
                 </div>
             </div>
-            <div className="flex items-center gap-3">
-                <div className="hidden items-center gap-3 sm:flex">
-                    <div className="flex items-center gap-1.5 text-[13px]">
-                        <span className="text-foreground font-mono font-semibold tabular-nums">
-                            {payload.files.length}
-                        </span>
-                        <span className="text-muted-foreground">
-                            file{payload.files.length === 1 ? "" : "s"}
-                        </span>
-                    </div>
-                    <Divider />
-                    <div className="flex items-center gap-2">
-                        <span className="font-mono text-[12px] text-emerald-400 tabular-nums">
-                            +{totals.add}
-                        </span>
-                        <span className="font-mono text-[12px] text-rose-400 tabular-nums">
-                            −{totals.del}
-                        </span>
-                        <RatioBar add={totals.add} del={totals.del} />
-                    </div>
-                </div>
-                <Divider />
-                <div className="flex items-center gap-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+                <div className="flex items-center gap-0.5">
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={onReload}
                         disabled={isReloading}
                         title="Reload diff"
-                        className="text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground size-8 px-0"
                     >
                         <RefreshCw className={isReloading ? "animate-spin" : undefined} />
                     </Button>
@@ -172,8 +128,8 @@ export function Header({
                         aria-pressed={wrap}
                         title={wrap ? "Disable line wrapping" : "Enable line wrapping"}
                         className={cn(
-                            "text-muted-foreground hover:text-foreground",
-                            wrap && "text-foreground bg-muted/60",
+                            "text-muted-foreground hover:text-foreground size-8 px-0",
+                            wrap && "text-foreground bg-muted",
                         )}
                     >
                         <WrapText />
@@ -181,22 +137,14 @@ export function Header({
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={onExpandAll}
-                        title="Expand all files"
-                        className="text-muted-foreground hover:text-foreground"
+                        onClick={allExpanded ? onCollapseAll : onExpandAll}
+                        title={allExpanded ? "Collapse all files" : "Expand all files"}
+                        className="text-muted-foreground hover:text-foreground size-8 px-0"
                     >
-                        <ChevronsUpDown />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onCollapseAll}
-                        title="Collapse all files"
-                        className="text-muted-foreground hover:text-foreground"
-                    >
-                        <ChevronsDownUp />
+                        {allExpanded ? <ChevronsDownUp /> : <ChevronsUpDown />}
                     </Button>
                 </div>
+                <Divider />
                 <ViewToggle value={viewMode} onChange={onViewModeChange} />
                 <Divider />
                 <Button
@@ -207,11 +155,11 @@ export function Header({
                     title={showComments ? "Hide comments sidebar" : "Show comments sidebar"}
                     className={cn(
                         "relative text-muted-foreground hover:text-foreground",
-                        showComments && "text-foreground bg-muted/60",
+                        showComments && "text-foreground bg-muted",
                     )}
                 >
                     <MessageSquare />
-                    <span className="ml-1.5 hidden sm:inline">Comments</span>
+                    <span className="hidden lg:inline">Comments</span>
                     {commentCount > 0 ? (
                         <Badge
                             variant="secondary"
