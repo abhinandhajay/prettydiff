@@ -32,10 +32,32 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
     const addPct = totalChanged === 0 ? 0 : (totalAdd / totalChanged) * 100;
     const delPct = totalChanged === 0 ? 0 : (totalDel / totalChanged) * 100;
 
+    const pathsKey = useMemo(() => paths.join("\n"), [paths]);
+    const gitKey = useMemo(
+        () => gitStatus.map((g) => `${g.path}:${g.status}`).join("\n"),
+        [gitStatus],
+    );
+    const dirPaths = useMemo(() => {
+        const dirs = new Set<string>();
+        for (const p of paths) {
+            let idx = p.indexOf("/");
+            while (idx !== -1) {
+                dirs.add(p.slice(0, idx));
+                idx = p.indexOf("/", idx + 1);
+            }
+        }
+        return [...dirs];
+    }, [paths]);
+
     const onScrollToRef = useRef(onScrollTo);
     useEffect(() => {
         onScrollToRef.current = onScrollTo;
     }, [onScrollTo]);
+
+    const pathsRef = useRef(paths);
+    useEffect(() => {
+        pathsRef.current = paths;
+    }, [paths]);
 
     const { model } = useFileTree({
         paths,
@@ -47,11 +69,29 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
         onSelectionChange: (selected) => {
             const last = selected[selected.length - 1];
             if (!last) return;
-            if (paths.includes(last)) {
+            if (pathsRef.current.includes(last)) {
                 onScrollToRef.current(last);
             }
         },
     });
+
+    // useFileTree builds the model once and never reacts to prop changes, so on
+    // reload we push the new working-tree state into the existing model. Reset
+    // the paths only when the file set changes (re-opening directories so the
+    // tree stays expanded); a status-only change just updates git status and
+    // keeps the current expansion.
+    const treeSyncRef = useRef<{ paths: string; git: string } | null>(null);
+    useEffect(() => {
+        const prev = treeSyncRef.current;
+        treeSyncRef.current = { paths: pathsKey, git: gitKey };
+        if (!prev) return;
+        if (prev.paths !== pathsKey) {
+            model.resetPaths(paths, { initialExpandedPaths: dirPaths });
+            model.setGitStatus(gitStatus);
+        } else if (prev.git !== gitKey) {
+            model.setGitStatus(gitStatus);
+        }
+    }, [model, pathsKey, gitKey, paths, gitStatus, dirPaths]);
 
     const activeStyleRef = useRef<HTMLStyleElement | null>(null);
     useEffect(() => {
