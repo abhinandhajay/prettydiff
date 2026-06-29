@@ -5,7 +5,7 @@
 
 A refined local web viewer for your Git working tree changes. Run `prettydiff` inside any Git repository and a browser tab opens with a side-by-side or unified diff of every modified, added, deleted, renamed, and untracked file.
 
-![prettydiff screenshot](https://utfs.io/f/1Dz4wc6RUalTe5pGJrWwg7NTJVO6bYFZ5mx9d2sPEQcXKu0I)
+![prettydiff screenshot](https://zlbhhflgmo.ufs.sh/f/1Dz4wc6RUalTkFP7DNWKfmH0Ec27OrBGV6X5xptdWIe1jYTo)
 
 ## Features
 
