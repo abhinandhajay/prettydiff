@@ -84,18 +84,6 @@ function scanPatch(rawPatch: string): PatchScan {
     return { additions, deletions, changedAdditions, changedDeletions };
 }
 
-export function buildPatchIndex(rawPatch: string): PatchLineIndex {
-    const scan = scanPatch(rawPatch);
-    return {
-        additions: scan.additions,
-        deletions: scan.deletions,
-        changedAdditions: scan.changedAdditions,
-        changedDeletions: scan.changedDeletions,
-        patchAdditions: new Set(scan.additions.keys()),
-        patchDeletions: new Set(scan.deletions.keys()),
-    };
-}
-
 function splitFileLines(contents: string): string[] {
     const lines = contents.split("\n");
     // A trailing newline yields a spurious empty final element — drop it so the
@@ -110,7 +98,7 @@ function splitFileLines(contents: string): string[] {
  * mark which lines are genuine changes vs context (and which context lines were inside the original
  * hunks).
  */
-export function buildContentsIndex(file: ParsedFile): PatchLineIndex {
+function buildContentsIndex(file: ParsedFile): PatchLineIndex {
     const scan = scanPatch(file.rawPatch);
     const additions = new Map<number, string>();
     const deletions = new Map<number, string>();
@@ -129,10 +117,7 @@ export function buildContentsIndex(file: ParsedFile): PatchLineIndex {
 }
 
 export function buildFileIndex(file: ParsedFile): PatchLineIndex {
-    if (file.oldContents !== undefined || file.newContents !== undefined) {
-        return buildContentsIndex(file);
-    }
-    return buildPatchIndex(file.rawPatch);
+    return buildContentsIndex(file);
 }
 
 export function markStaleComments(

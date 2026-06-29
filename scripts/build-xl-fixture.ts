@@ -249,6 +249,58 @@ function renderHunk(h: HunkSpec): string {
     return `${header}\n${body}`;
 }
 
+function linesFromPrefixedRows(rows: string[]): string {
+    return rows.map((row) => row.slice(1)).join("\n") + "\n";
+}
+
+function fillerLine(ext: Ext, lineNumber: number): string {
+    if (ext === "md") return `- unchanged context ${lineNumber}`;
+    return `${COMMENT_PREFIX[ext]} unchanged context ${lineNumber}`;
+}
+
+function buildContentsFromHunks(
+    ext: Ext,
+    hunks: HunkSpec[],
+): Pick<ParsedFile, "oldContents" | "newContents"> {
+    const oldLines = new Map<number, string>();
+    const newLines = new Map<number, string>();
+
+    for (const hunk of hunks) {
+        let oldLine = hunk.oldStart;
+        let newLine = hunk.newStart;
+        for (const row of hunk.rows) {
+            if (row.kind === " ") {
+                oldLines.set(oldLine, row.text);
+                newLines.set(newLine, row.text);
+                oldLine += 1;
+                newLine += 1;
+            } else if (row.kind === "-") {
+                oldLines.set(oldLine, row.text);
+                oldLine += 1;
+            } else {
+                newLines.set(newLine, row.text);
+                newLine += 1;
+            }
+        }
+    }
+
+    const maxOld = Math.max(0, ...oldLines.keys());
+    const maxNew = Math.max(0, ...newLines.keys());
+    const oldContents = Array.from({ length: maxOld }, (_, i) => {
+        const lineNumber = i + 1;
+        return oldLines.get(lineNumber) ?? fillerLine(ext, lineNumber);
+    }).join("\n");
+    const newContents = Array.from({ length: maxNew }, (_, i) => {
+        const lineNumber = i + 1;
+        return newLines.get(lineNumber) ?? fillerLine(ext, lineNumber);
+    }).join("\n");
+
+    return {
+        oldContents: oldContents ? `${oldContents}\n` : "",
+        newContents: newContents ? `${newContents}\n` : "",
+    };
+}
+
 function shortSha(n: number): string {
     return n.toString(16).padStart(7, "0").slice(0, 7);
 }
@@ -289,6 +341,7 @@ function buildModified(path: string, ext: Ext, hunkCount: number): ParsedFile {
         additions,
         deletions,
         rawPatch: `${head}\n${body}\n`,
+        ...buildContentsFromHunks(ext, hunks),
     };
 }
 
@@ -309,6 +362,8 @@ function buildAdded(path: string, ext: Ext, lineCount: number): ParsedFile {
         additions: lineCount,
         deletions: 0,
         rawPatch: `${head}\n${rows.join("\n")}\n`,
+        oldContents: "",
+        newContents: linesFromPrefixedRows(rows),
     };
 }
 
@@ -334,6 +389,8 @@ function buildDeleted(path: string, ext: Ext, lineCount: number): ParsedFile {
         additions: 0,
         deletions: lineCount,
         rawPatch: `${head}\n${rows.join("\n")}\n`,
+        oldContents: linesFromPrefixedRows(rows),
+        newContents: "",
     };
 }
 
@@ -356,6 +413,8 @@ function buildRenamedWithEdits(newPath: string, oldPath: string, ext: Ext): Pars
         additions: modified.additions,
         deletions: modified.deletions,
         rawPatch: `${head}\n${bodyMatch}`,
+        oldContents: modified.oldContents,
+        newContents: modified.newContents,
     };
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { buildContentsIndex, buildFileIndex, buildPatchIndex } from "@/lib/comments";
+import { buildFileIndex } from "@/lib/comments";
 
 import type { ParsedFile } from "@/lib/types";
 
@@ -14,8 +14,8 @@ const modified: ParsedFile = {
     newContents: "a\nB-changed\nc\nd\ne\n",
 };
 
-describe("buildContentsIndex", () => {
-    const idx = buildContentsIndex(modified);
+describe("buildFileIndex", () => {
+    const idx = buildFileIndex(modified);
 
     it("indexes every line of the full file, not just the patch", () => {
         expect(idx.additions.size).toBe(5);
@@ -35,24 +35,7 @@ describe("buildContentsIndex", () => {
         expect(idx.patchAdditions.has(5)).toBe(false);
         expect(idx.patchDeletions.has(4)).toBe(false);
     });
-});
-
-describe("buildFileIndex", () => {
     it("uses full contents when present", () => {
         expect(buildFileIndex(modified).additions.size).toBe(5);
-    });
-
-    it("falls back to the patch when contents are absent", () => {
-        const patchOnly: ParsedFile = {
-            path: "y.ts",
-            status: "modified",
-            additions: 1,
-            deletions: 1,
-            rawPatch: "@@ -1,3 +1,3 @@\n a\n-b\n+B-changed\n c\n",
-        };
-        const idx = buildFileIndex(patchOnly);
-        // only the patch's three lines are known
-        expect(idx.additions.size).toBe(3);
-        expect(buildPatchIndex(patchOnly.rawPatch).additions.size).toBe(3);
     });
 });

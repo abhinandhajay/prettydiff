@@ -1,7 +1,7 @@
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentIndicator } from "@/components/CommentIndicator";
+import { DiffErrorBoundary } from "@/components/DiffErrorBoundary";
 import { LazyDiffBody } from "@/components/LazyDiffBody";
-import { PatchErrorBoundary } from "@/components/PatchErrorBoundary";
 import { SkippedPreview } from "@/components/SkippedPreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -325,7 +325,7 @@ function FileCardImpl({
                             {file.skipped ? (
                                 <SkippedPreview reason={file.skipped.reason} />
                             ) : (
-                                <PatchErrorBoundary
+                                <DiffErrorBoundary
                                     key={file.path}
                                     fallback={<SkippedPreview reason="render-error" />}
                                 >
@@ -370,7 +370,7 @@ function FileCardImpl({
                                             />
                                         </div>
                                     </LazyDiffBody>
-                                </PatchErrorBoundary>
+                                </DiffErrorBoundary>
                             )}
                         </div>
                     </div>
