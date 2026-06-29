@@ -37,7 +37,7 @@ export function InlineCommentEditor({
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 rows={rows}
-                className={`bg-background/60 ${minHeightClass} resize-y text-[12.5px] leading-relaxed`}
+                className={`bg-background ${minHeightClass} resize-y text-[12.5px] leading-relaxed`}
                 onKeyDown={(e) => {
                     if (e.key === "Escape") {
                         e.preventDefault();

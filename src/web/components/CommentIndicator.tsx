@@ -20,6 +20,14 @@ export function commentIndicatorDomId(id: string): string {
     return `comment-line-${id}`;
 }
 
+/** Left rail color keyed to the commented line, mirroring the diff's change bars. */
+const RAIL: Record<DiffComment["lineType"], string> = {
+    "change-addition": "bg-emerald-500/70",
+    "change-deletion": "bg-rose-500/70",
+    context: "bg-muted-foreground/30",
+    "context-expanded": "bg-muted-foreground/30",
+};
+
 export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar, flash }: Props) {
     const [editing, setEditing] = useState(false);
     const stale = Boolean(comment.stale);
@@ -28,33 +36,33 @@ export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar, 
         <div
             id={commentIndicatorDomId(comment.id)}
             className={cn(
-                "border-primary/30 bg-primary/4 mx-2 mt-0 mb-2 overflow-hidden rounded-sm rounded-t-none border border-t-0",
+                "border-border/55 bg-muted/25 relative border-b py-2 pr-3 pl-4 transition-colors",
                 stale && "opacity-60",
-                flash && "ring-primary/60 ring-2 ring-offset-1 ring-offset-transparent",
+                flash && "bg-primary/10",
             )}
         >
-            <div className="px-3 pt-2.5 pb-2">
-                {editing ? (
-                    <InlineCommentEditor
-                        initialValue={comment.body}
-                        onSave={(body) => {
-                            onEdit(comment.id, body);
-                            setEditing(false);
-                        }}
-                        onCancel={() => setEditing(false)}
-                        rows={3}
-                        minHeightClass="min-h-16"
-                    />
-                ) : (
+            <span
+                aria-hidden
+                className={cn("absolute inset-y-0 left-0 w-[2px]", RAIL[comment.lineType])}
+            />
+            {editing ? (
+                <InlineCommentEditor
+                    initialValue={comment.body}
+                    onSave={(body) => {
+                        onEdit(comment.id, body);
+                        setEditing(false);
+                    }}
+                    onCancel={() => setEditing(false)}
+                    rows={3}
+                    minHeightClass="min-h-16"
+                />
+            ) : (
+                <>
                     <p className="text-foreground/90 text-[12.5px] leading-relaxed whitespace-pre-wrap">
                         {comment.body}
                     </p>
-                )}
-            </div>
-            {!editing ? (
-                <div className="bg-muted/35 border-border/60 flex items-center justify-between gap-2 border-t px-3 py-1">
-                    <div className="flex min-w-0 items-center gap-2">
-                        <span className="text-muted-foreground/70 font-mono text-[10.5px] tabular-nums">
+                    <div className="mt-1.5 flex items-center gap-2">
+                        <span className="text-muted-foreground/60 font-mono text-[10.5px] tabular-nums">
                             {formatRelativeTime(comment.createdAt)}
                         </span>
                         {stale ? (
@@ -73,31 +81,31 @@ export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar, 
                         >
                             open in sidebar
                         </button>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-0.5">
-                        {!stale ? (
+                        <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                            {!stale ? (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-muted-foreground/70 hover:text-foreground size-6"
+                                    onClick={() => setEditing(true)}
+                                    title="Edit"
+                                >
+                                    <Pencil className="size-3" />
+                                </Button>
+                            ) : null}
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-muted-foreground/70 hover:text-foreground size-6"
-                                onClick={() => setEditing(true)}
-                                title="Edit"
+                                className="text-muted-foreground/70 hover:bg-destructive hover:text-destructive-foreground size-6"
+                                onClick={() => onDelete(comment.id)}
+                                title="Delete"
                             >
-                                <Pencil className="size-3" />
+                                <Trash2 className="size-3" />
                             </Button>
-                        ) : null}
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground/70 hover:bg-destructive hover:text-destructive-foreground size-6"
-                            onClick={() => onDelete(comment.id)}
-                            title="Delete"
-                        >
-                            <Trash2 className="size-3" />
-                        </Button>
+                        </div>
                     </div>
-                </div>
-            ) : null}
+                </>
+            )}
         </div>
     );
 }

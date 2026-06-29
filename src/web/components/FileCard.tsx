@@ -295,7 +295,7 @@ function FileCardImpl({
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="text-muted-foreground hover:text-foreground size-7 opacity-0 transition-opacity group-hover/card:opacity-100 focus-visible:opacity-100"
+                            className="text-muted-foreground hover:text-foreground size-7"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 navigator.clipboard?.writeText(file.path);
