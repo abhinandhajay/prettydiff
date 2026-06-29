@@ -554,10 +554,10 @@ export default function App() {
                 <EmptyState kind="empty" title="No changes" message="Working tree matches HEAD." />
             ) : (
                 <div
-                    className="grid min-h-0 flex-1 transition-[grid-template-columns] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                    className="relative grid min-h-0 flex-1 overflow-hidden"
                     style={{
                         gridTemplateColumns: `minmax(0, min(276px, 24vw)) minmax(0, 1fr) ${
-                            showCommentsSidebar ? "minmax(0, min(340px, 28vw))" : "0px"
+                            showCommentsSidebar ? "min(340px, 28vw)" : "0px"
                         }`,
                     }}
                 >
@@ -596,7 +596,10 @@ export default function App() {
                             })}
                         </div>
                     </main>
-                    <div className="h-full overflow-hidden">
+                    <div
+                        className="pointer-events-none absolute inset-y-0 right-0 z-10 overflow-hidden"
+                        style={{ width: "min(340px, 28vw)" }}
+                    >
                         <CommentsSidebar
                             open={showCommentsSidebar}
                             comments={comments}

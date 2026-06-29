@@ -151,8 +151,8 @@ export function CommentsSidebar({
         <aside
             data-state={open ? "open" : "closed"}
             className={cn(
-                "bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full w-full min-w-0 flex-col overflow-hidden border-l",
-                "transition-[transform,opacity] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                "bg-sidebar text-sidebar-foreground border-sidebar-border pointer-events-auto flex h-full w-full min-w-0 flex-col overflow-hidden border-l",
+                "transition-[translate,opacity] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]",
                 "data-[state=closed]:translate-x-full data-[state=closed]:opacity-0",
                 "data-[state=closed]:pointer-events-none",
             )}
