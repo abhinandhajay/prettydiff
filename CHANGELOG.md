@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-29
+
+### Added
+
+- Expandable context: collapsed regions between hunks can now be opened to reveal the surrounding lines, so you can read a change in its full context without leaving the viewer ([#5](https://github.com/abhinandhajay/prettydiff/pull/5)).
+
+### Changed
+
+- Redesigned diff viewer: full-bleed file cards, per-file diff stats in the sidebar, a cleaner top header, and overall theme tuning ([#6](https://github.com/abhinandhajay/prettydiff/pull/6)).
+- Inline comments now render as flat diff annotations, and the comments sidebar slides in and out smoothly ([#6](https://github.com/abhinandhajay/prettydiff/pull/6)).
+- Reloading now refreshes the file tree alongside the diff.
+
+### Fixed
+
+- Symlinked working-tree files are handled correctly instead of erroring ([#5](https://github.com/abhinandhajay/prettydiff/pull/5)).
+- Click-to-scroll from a comment now lands precisely on the target line in multi-file diffs ([#5](https://github.com/abhinandhajay/prettydiff/pull/5)).
+- Diffs that span multiple blocks within a single file now reconstruct correctly ([#5](https://github.com/abhinandhajay/prettydiff/pull/5)).
+
 ## [0.3.0] - 2026-05-28
 
 ### Changed
@@ -39,6 +57,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 - Detects modified, added, deleted, renamed, and untracked files.
 - Flags: `--port <n>`, `--no-open`, `--version` / `-v`, `--help` / `-h`.
 
+[0.4.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.4.0
 [0.3.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.3.0
 [0.2.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.2.0
 [0.1.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.1.0
