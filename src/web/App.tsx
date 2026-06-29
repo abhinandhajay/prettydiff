@@ -290,6 +290,11 @@ export default function App() {
 
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
 
+    const allExpanded = useMemo(
+        () => (payload ? payload.files.every((f) => openMap[f.path] ?? true) : true),
+        [payload, openMap],
+    );
+
     const totalCommentCount = useMemo(
         () => Object.values(comments).reduce((n, list) => n + list.length, 0),
         [comments],
@@ -544,6 +549,7 @@ export default function App() {
                 onWrapChange={setWrap}
                 onExpandAll={expandAll}
                 onCollapseAll={collapseAll}
+                allExpanded={allExpanded}
                 onReload={reload}
                 isReloading={isReloading}
                 showComments={showCommentsSidebar}
