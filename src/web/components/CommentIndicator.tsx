@@ -1,6 +1,7 @@
 import { InlineCommentEditor } from "@/components/InlineCommentEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { lineTypeAccent } from "@/lib/comments";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Pencil, Trash2 } from "lucide-react";
@@ -20,14 +21,6 @@ export function commentIndicatorDomId(id: string): string {
     return `comment-line-${id}`;
 }
 
-/** Left rail color keyed to the commented line, mirroring the diff's change bars. */
-const RAIL: Record<DiffComment["lineType"], string> = {
-    "change-addition": "bg-emerald-500/70",
-    "change-deletion": "bg-rose-500/70",
-    context: "bg-muted-foreground/30",
-    "context-expanded": "bg-muted-foreground/30",
-};
-
 export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar, flash }: Props) {
     const [editing, setEditing] = useState(false);
     const stale = Boolean(comment.stale);
@@ -43,7 +36,10 @@ export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar, 
         >
             <span
                 aria-hidden
-                className={cn("absolute inset-y-0 left-0 w-[2px]", RAIL[comment.lineType])}
+                className={cn(
+                    "absolute inset-y-0 left-0 w-[2px]",
+                    lineTypeAccent[comment.lineType].rail,
+                )}
             />
             {editing ? (
                 <InlineCommentEditor

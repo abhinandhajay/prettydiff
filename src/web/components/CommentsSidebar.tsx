@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { lineTypeAccent } from "@/lib/comments";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -59,19 +60,8 @@ function groupByFile(comments: CommentMap): FileGroup[] {
 const SIDE_MARK: Record<CommentLineType, string> = {
     "change-addition": "+",
     "change-deletion": "−",
-    context: " ",
-    "context-expanded": " ",
-};
-
-/** Rail + glyph color keyed to the commented line, mirroring the diff's change bars. */
-const SIDE_ACCENT: Record<CommentLineType, { rail: string; text: string }> = {
-    "change-addition": {
-        rail: "bg-emerald-500/70",
-        text: "text-emerald-600 dark:text-emerald-400",
-    },
-    "change-deletion": { rail: "bg-rose-500/70", text: "text-rose-600 dark:text-rose-400" },
-    context: { rail: "bg-muted-foreground/30", text: "text-muted-foreground" },
-    "context-expanded": { rail: "bg-muted-foreground/30", text: "text-muted-foreground" },
+    context: "",
+    "context-expanded": "",
 };
 
 function fileHeaderCheckState(
@@ -352,8 +342,8 @@ function CommentRow({
     register,
 }: CommentRowProps) {
     const [editing, setEditing] = useState(false);
-    const accent = SIDE_ACCENT[comment.lineType];
-    const sideMark = SIDE_MARK[comment.lineType].trim();
+    const accent = lineTypeAccent[comment.lineType];
+    const sideMark = SIDE_MARK[comment.lineType];
     const stale = Boolean(comment.stale);
 
     return (

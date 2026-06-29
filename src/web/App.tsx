@@ -34,6 +34,8 @@ const EMPTY_PATCH_INDEX: PatchLineIndex = {
 const HUGE_DIFF_LINE_THRESHOLD = 5000;
 const ESTIMATED_DIFF_HEADER_HEIGHT = 56;
 const ESTIMATED_DIFF_LINE_HEIGHT = 18;
+// The comments sidebar floats in an overlay sized to match the grid track it reserves.
+const COMMENTS_SIDEBAR_WIDTH = "min(340px, 28vw)";
 
 interface DiffFileRenderMeta {
     estimatedHeight: number;
@@ -563,7 +565,7 @@ export default function App() {
                     className="relative grid min-h-0 flex-1 overflow-hidden"
                     style={{
                         gridTemplateColumns: `minmax(0, min(276px, 24vw)) minmax(0, 1fr) ${
-                            showCommentsSidebar ? "min(340px, 28vw)" : "0px"
+                            showCommentsSidebar ? COMMENTS_SIDEBAR_WIDTH : "0px"
                         }`,
                     }}
                 >
@@ -604,7 +606,7 @@ export default function App() {
                     </main>
                     <div
                         className="pointer-events-none absolute inset-y-0 right-0 z-10 overflow-hidden"
-                        style={{ width: "min(340px, 28vw)" }}
+                        style={{ width: COMMENTS_SIDEBAR_WIDTH }}
                     >
                         <CommentsSidebar
                             open={showCommentsSidebar}
