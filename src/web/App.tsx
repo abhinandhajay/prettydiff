@@ -556,7 +556,9 @@ export default function App() {
                 <div
                     className="grid min-h-0 flex-1 transition-[grid-template-columns] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]"
                     style={{
-                        gridTemplateColumns: `276px 1fr ${showCommentsSidebar ? "340px" : "0px"}`,
+                        gridTemplateColumns: `minmax(0, min(276px, 24vw)) minmax(0, 1fr) ${
+                            showCommentsSidebar ? "minmax(0, min(340px, 28vw))" : "0px"
+                        }`,
                     }}
                 >
                     <FileTreeSidebar
@@ -564,8 +566,8 @@ export default function App() {
                         activePath={activePath}
                         onScrollTo={scrollToFile}
                     />
-                    <main ref={mainRef} className="min-h-0 overflow-y-auto">
-                        <div className="space-y-3 px-5 py-5">
+                    <main ref={mainRef} className="bg-card min-h-0 overflow-y-auto">
+                        <div>
                             {sortedFiles.map((f) => {
                                 const meta = fileRenderMeta.byPath.get(f.path);
                                 return (

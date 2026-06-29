@@ -140,17 +140,17 @@ export function CommentsSidebar({
         <aside
             data-state={open ? "open" : "closed"}
             className={cn(
-                "bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full w-[340px] min-h-0 flex-col overflow-hidden border-l",
+                "bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full w-full min-w-0 flex-col overflow-hidden border-l",
                 "transition-[transform,opacity] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]",
                 "data-[state=closed]:translate-x-full data-[state=closed]:opacity-0",
                 "data-[state=closed]:pointer-events-none",
             )}
             aria-hidden={!open}
         >
-            <div className="border-sidebar-border flex h-12 shrink-0 items-center justify-between border-b px-3">
+            <div className="border-sidebar-border flex h-10 shrink-0 items-center justify-between border-b px-3">
                 <div className="flex items-center gap-2">
-                    <span className="text-primary text-[11px] leading-none">◆</span>
-                    <span className="text-foreground/85 text-[11px] font-medium tracking-[0.14em] uppercase">
+                    <span className="bg-muted-foreground/80 size-1.5 rounded-full" aria-hidden />
+                    <span className="text-foreground/80 text-[10px] font-medium tracking-[0.14em] uppercase">
                         Comments
                     </span>
                     {totalCount > 0 ? (
@@ -167,7 +167,7 @@ export function CommentsSidebar({
             {totalCount === 0 ? (
                 <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
                     <MessageSquareOff className="size-5 opacity-60" />
-                    <p className="text-foreground/70 max-w-55 text-[12.5px] leading-snug">
+                    <p className="text-foreground/65 max-w-55 text-[12px] leading-snug">
                         Hover a line, tap +, leave a note.
                     </p>
                 </div>
@@ -271,7 +271,7 @@ function FileGroupBlock({
 
     return (
         <Collapsible open={open} onOpenChange={setOpen} className="mb-1.5">
-            <div className="hover:bg-muted/40 flex items-center gap-1.5 rounded-md px-1.5 py-1.5">
+            <div className="hover:bg-muted/45 flex items-center gap-1.5 rounded-sm px-1.5 py-1.5">
                 <Checkbox
                     checked={headerCheckState}
                     onCheckedChange={(v) => onToggleFile(group.path, v === true)}
@@ -287,12 +287,12 @@ function FileGroupBlock({
                         )}
                         <FolderClosed className="text-muted-foreground/60 size-3 shrink-0" />
                         <span
-                            className="text-foreground/90 truncate font-mono text-[12px]"
+                            className="text-foreground/85 truncate font-mono text-[11.5px]"
                             title={group.path}
                         >
                             {group.path}
                         </span>
-                        <span className="bg-muted/40 text-muted-foreground/90 ml-auto shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] tabular-nums">
+                        <span className="bg-muted/50 text-muted-foreground/90 ml-auto shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10px] tabular-nums">
                             {group.comments.length}
                         </span>
                     </button>
@@ -347,8 +347,8 @@ function CommentRow({
         <div
             ref={register}
             className={cn(
-                "relative mr-3 overflow-hidden rounded-lg border transition-[box-shadow,background-color,border-color]",
-                "border-border/50 bg-card",
+                "relative mr-2 overflow-hidden rounded-sm border transition-[box-shadow,background-color,border-color]",
+                "border-border/70 bg-card/80",
                 checked && !comment.stale && "border-primary/40 bg-primary/4",
                 comment.stale && "opacity-60",
                 flash && "ring-primary/60 ring-2 ring-offset-1 ring-offset-transparent",
@@ -356,7 +356,7 @@ function CommentRow({
         >
             <div
                 className={cn(
-                    "bg-muted/40 border-border/50 flex items-center justify-between gap-1.5 border-b px-2.5 py-1",
+                    "bg-muted/35 border-border/60 flex items-center justify-between gap-1.5 border-b px-2.5 py-1",
                     checked && !comment.stale && "border-primary/25",
                 )}
             >
@@ -415,7 +415,7 @@ function CommentRow({
                 )}
             </div>
             {!editing ? (
-                <div className="bg-muted/40 border-border/50 flex items-center justify-between gap-2 border-t px-2.5 py-1">
+                <div className="bg-muted/35 border-border/60 flex items-center justify-between gap-2 border-t px-2.5 py-1">
                     <div className="flex items-center gap-2">
                         <span className="text-muted-foreground/70 font-mono text-[10.5px] tabular-nums">
                             {formatRelativeTime(comment.createdAt)}

@@ -10,10 +10,10 @@ interface Props {
 
 const itemClass =
     "h-8 rounded-none border-0 px-2.5 text-[11.5px] font-medium tracking-tight " +
-    "text-muted-foreground hover:text-foreground hover:bg-muted/40 " +
-    "data-[state=on]:bg-secondary/80 data-[state=on]:text-foreground " +
-    "data-[state=on]:shadow-[inset_0_-1.5px_0_var(--primary)] " +
-    "transition-colors first:rounded-l-md last:rounded-r-md";
+    "text-muted-foreground hover:text-foreground hover:bg-muted/55 " +
+    "data-[state=on]:bg-muted data-[state=on]:text-foreground " +
+    "data-[state=on]:shadow-[inset_0_-1px_0_var(--primary)] " +
+    "transition-colors first:rounded-l-sm last:rounded-r-sm";
 
 export function ViewToggle({ value, onChange }: Props) {
     return (
@@ -23,7 +23,7 @@ export function ViewToggle({ value, onChange }: Props) {
             onValueChange={(v) => v && onChange(v as ViewMode)}
             variant="outline"
             size="sm"
-            className="border-border bg-muted/20 gap-0 overflow-hidden rounded-md border"
+            className="border-border bg-card gap-0 overflow-hidden rounded-sm border"
         >
             <ToggleGroupItem value="unified" aria-label="Unified view" className={itemClass}>
                 <Rows className="size-3.5" />

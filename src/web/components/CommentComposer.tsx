@@ -19,10 +19,10 @@ export function CommentComposer({ onSave, onCancel }: Props) {
     const canSave = trimmed.length > 0;
 
     return (
-        <div className="bg-card border-primary/25 mx-3 my-2 overflow-hidden rounded-lg border">
-            <div className="bg-muted/40 border-primary/20 flex items-center justify-between gap-2 border-b px-3 py-1.5">
+        <div className="bg-card border-primary/25 mx-2 my-2 overflow-hidden rounded-sm border">
+            <div className="bg-muted/35 border-primary/20 flex items-center justify-between gap-2 border-b px-3 py-1.5">
                 <div className="flex items-center gap-1.5">
-                    <span className="text-primary text-[11px] leading-none">◆</span>
+                    <span className="bg-muted-foreground/80 size-1.5 rounded-full" aria-hidden />
                     <span className="text-foreground/85 text-[11px] font-medium tracking-[0.14em] uppercase">
                         New comment
                     </span>
@@ -47,7 +47,7 @@ export function CommentComposer({ onSave, onCancel }: Props) {
                     }}
                     placeholder="Note something for your AI agent to pick up…"
                     rows={3}
-                    className="bg-background/60 min-h-20 resize-y text-[13px] leading-relaxed"
+                    className="bg-background min-h-20 resize-y text-[13px] leading-relaxed"
                 />
                 <div className="mt-2.5 flex items-center justify-end gap-2">
                     <Button variant="ghost" size="sm" onClick={onCancel}>

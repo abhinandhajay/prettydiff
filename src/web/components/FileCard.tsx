@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { commentKey, commentsByKey } from "@/lib/comments";
 import { fileCardId } from "@/lib/slug";
-import { cn } from "@/lib/utils";
 import { MultiFileDiff } from "@pierre/diffs/react";
 import {
     ArrowRight,
@@ -48,7 +47,7 @@ function GutterAddButton({ onClick }: { onClick: () => void }) {
                 boxShadow:
                     "0 0 0 1px color-mix(in oklab, var(--color-primary) 65%, transparent), 0 2px 6px -2px color-mix(in oklab, var(--color-primary) 50%, transparent), inset 0 1px 0 0 rgba(255,255,255,0.18)",
             }}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 relative z-5 inline-flex shrink-0 items-center justify-center rounded-md transition-[transform,background-color] duration-100 ease-out hover:scale-105 active:scale-95"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 relative z-5 inline-flex shrink-0 items-center justify-center rounded-sm transition-[transform,background-color] duration-100 ease-out hover:scale-105 active:scale-95"
             title="Add comment to this line"
             aria-label="Add comment to this line"
         >
@@ -87,14 +86,6 @@ const STATUS_VARIANT: Record<
     deleted: "destructive",
     renamed: "outline",
     untracked: "warning",
-};
-
-const STATUS_STRIPE: Record<FileStatus, string> = {
-    added: "bg-emerald-500/70",
-    modified: "bg-primary/70",
-    deleted: "bg-rose-500/70",
-    renamed: "bg-sky-500/60",
-    untracked: "bg-amber-500/70",
 };
 
 function StatusIcon({ status }: { status: FileStatus }) {
@@ -247,65 +238,64 @@ function FileCardImpl({
     }, [hoveredLine, lineAnnotations]);
 
     return (
-        <div
+        <section
             id={fileCardId(file.path)}
-            className="bg-card/80 group/card border-border/70 hover:border-border relative overflow-clip rounded-lg border transition-colors"
+            className="group/card border-border bg-card relative overflow-clip border-r border-b"
             data-file-path={file.path}
         >
-            <span
-                aria-hidden
-                className={cn("absolute inset-y-0 left-0 w-0.5", STATUS_STRIPE[file.status])}
-            />
             <Collapsible open={open} onOpenChange={handleOpenChange}>
-                <div className="bg-muted/60 border-border/60 sticky top-0 z-10 flex items-center justify-between gap-3 border-b px-3 py-2 pl-4 backdrop-blur">
+                <div className="bg-card border-border sticky top-0 z-10 flex min-h-10 items-center justify-between gap-3 border-b px-3 py-1.5 pl-4">
                     <CollapsibleTrigger asChild>
                         <button className="flex min-w-0 flex-1 items-center gap-2 text-left">
                             {open ? (
-                                <ChevronDown className="text-muted-foreground/70 group-hover/card:text-muted-foreground size-4 shrink-0 transition-colors" />
+                                <ChevronDown className="text-muted-foreground group-hover/card:text-foreground/80 size-4 shrink-0 transition-colors" />
                             ) : (
-                                <ChevronRight className="text-muted-foreground/70 group-hover/card:text-muted-foreground size-4 shrink-0 transition-colors" />
+                                <ChevronRight className="text-muted-foreground group-hover/card:text-foreground/80 size-4 shrink-0 transition-colors" />
                             )}
-                            <span className="text-muted-foreground/80 shrink-0">
+                            <span className="text-muted-foreground shrink-0">
                                 <StatusIcon status={file.status} />
                             </span>
-                            <span className="truncate font-mono text-[13px]" title={file.path}>
+                            <span className="truncate font-mono text-[12.5px]" title={file.path}>
                                 {file.oldPath ? (
                                     <>
-                                        <span className="text-muted-foreground/70 line-through">
+                                        <span className="text-muted-foreground line-through">
                                             {file.oldPath}
                                         </span>
                                         <span className="text-muted-foreground mx-1.5">→</span>
-                                        <span className="text-muted-foreground/70">{dir}</span>
+                                        <span className="text-muted-foreground">{dir}</span>
                                         <span className="text-foreground font-medium">{base}</span>
                                     </>
                                 ) : (
                                     <>
-                                        <span className="text-muted-foreground/70">{dir}</span>
+                                        <span className="text-muted-foreground">{dir}</span>
                                         <span className="text-foreground font-medium">{base}</span>
                                     </>
                                 )}
                             </span>
                         </button>
                     </CollapsibleTrigger>
-                    <div className="flex shrink-0 items-center gap-2.5">
+                    <div className="flex shrink-0 items-center gap-2">
                         {comments.length > 0 ? (
-                            <Badge variant="outline" className="font-mono text-[10px]">
+                            <Badge
+                                variant="outline"
+                                className="hidden font-mono text-[10px] sm:inline-flex"
+                            >
                                 {comments.length} comment{comments.length === 1 ? "" : "s"}
                             </Badge>
                         ) : null}
                         <Badge variant={STATUS_VARIANT[file.status]} dot>
                             {file.status}
                         </Badge>
-                        <span className="font-mono text-[11px] text-emerald-400 tabular-nums">
+                        <span className="font-mono text-[11px] text-emerald-600 tabular-nums dark:text-emerald-400">
                             +{file.additions}
                         </span>
-                        <span className="font-mono text-[11px] text-rose-400 tabular-nums">
+                        <span className="font-mono text-[11px] text-rose-600 tabular-nums dark:text-rose-400">
                             −{file.deletions}
                         </span>
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="text-muted-foreground/70 hover:text-foreground size-7"
+                            className="text-muted-foreground hover:text-foreground size-7 opacity-0 transition-opacity group-hover/card:opacity-100 focus-visible:opacity-100"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 navigator.clipboard?.writeText(file.path);
@@ -321,7 +311,7 @@ function FileCardImpl({
                     style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
                 >
                     <div className="overflow-hidden">
-                        <div className="px-3 py-2 pl-4">
+                        <div className="p-0 pl-1">
                             {file.skipped ? (
                                 <SkippedPreview reason={file.skipped.reason} />
                             ) : (
@@ -330,7 +320,7 @@ function FileCardImpl({
                                     fallback={<SkippedPreview reason="render-error" />}
                                 >
                                     <LazyDiffBody estimatedHeight={estimatedHeight}>
-                                        <div className="bg-background/40 overflow-x-auto">
+                                        <div className="bg-card overflow-x-auto">
                                             <MultiFileDiff<AnnotationMeta>
                                                 oldFile={oldFile}
                                                 newFile={newFile}
@@ -376,7 +366,7 @@ function FileCardImpl({
                     </div>
                 </div>
             </Collapsible>
-        </div>
+        </section>
     );
 }
 

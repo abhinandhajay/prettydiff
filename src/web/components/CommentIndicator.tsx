@@ -28,7 +28,7 @@ export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar, 
         <div
             id={commentIndicatorDomId(comment.id)}
             className={cn(
-                "border-primary/40 bg-primary/4 mx-3 mt-0 mb-2 overflow-hidden rounded-lg rounded-t-none border border-t-0",
+                "border-primary/30 bg-primary/4 mx-2 mt-0 mb-2 overflow-hidden rounded-sm rounded-t-none border border-t-0",
                 stale && "opacity-60",
                 flash && "ring-primary/60 ring-2 ring-offset-1 ring-offset-transparent",
             )}
@@ -52,7 +52,7 @@ export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar, 
                 )}
             </div>
             {!editing ? (
-                <div className="bg-muted/40 border-border/50 flex items-center justify-between gap-2 border-t px-3 py-1">
+                <div className="bg-muted/35 border-border/60 flex items-center justify-between gap-2 border-t px-3 py-1">
                     <div className="flex min-w-0 items-center gap-2">
                         <span className="text-muted-foreground/70 font-mono text-[10.5px] tabular-nums">
                             {formatRelativeTime(comment.createdAt)}
