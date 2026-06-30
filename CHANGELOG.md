@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-30
+
+### Added
+
+- Branch comparison controls let you choose a target branch and inspect changes against it from the viewer.
+
 ## [0.4.0] - 2026-06-29
 
 ### Added
@@ -57,6 +63,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 - Detects modified, added, deleted, renamed, and untracked files.
 - Flags: `--port <n>`, `--no-open`, `--version` / `-v`, `--help` / `-h`.
 
+[0.5.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.5.0
 [0.4.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.4.0
 [0.3.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.3.0
 [0.2.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.2.0
