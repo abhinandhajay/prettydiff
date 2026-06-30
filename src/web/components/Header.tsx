@@ -1,5 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
 import { repoBasename } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -26,6 +34,10 @@ interface Props {
     allExpanded: boolean;
     onReload: () => void;
     isReloading: boolean;
+    target: "working-tree" | "branch";
+    onTargetChange: (target: "working-tree" | "branch") => void;
+    targetRef?: string;
+    onTargetRefChange: (targetRef: string) => void;
     showComments: boolean;
     onShowCommentsChange: (v: boolean) => void;
     commentCount: number;
@@ -68,10 +80,23 @@ export function Header({
     allExpanded,
     onReload,
     isReloading,
+    target,
+    onTargetChange,
+    targetRef,
+    onTargetRefChange,
     showComments,
     onShowCommentsChange,
     commentCount,
 }: Props) {
+    const branchOptions = payload.branches.filter((branch) => !branch.current);
+    const fallbackTargetRef = branchOptions[0]?.name ?? payload.branch;
+    const selectedTargetRef = targetRef ?? payload.targetRef ?? fallbackTargetRef;
+
+    const changeTarget = (nextTarget: "working-tree" | "branch") => {
+        onTargetChange(nextTarget);
+        if (nextTarget === "branch" && !targetRef) onTargetRefChange(selectedTargetRef);
+    };
+
     return (
         <header className="bg-background isolate z-20 flex h-12 shrink-0 items-center justify-between gap-3 border-b px-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -92,12 +117,59 @@ export function Header({
                         {repoBasename(payload.repoRoot)}
                     </span>
                     <span
-                        className="text-foreground/80 bg-muted/60 inline-flex max-w-[180px] items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[11.5px]"
-                        title={`Branch: ${payload.branch}`}
+                        className="text-foreground/80 bg-muted/60 inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-md px-2 font-mono text-[11.5px]"
+                        title={`Current branch: ${payload.branch}`}
                     >
                         <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
                         <span className="truncate">{payload.branch}</span>
                     </span>
+                    <span className="text-muted-foreground text-[11.5px]">vs</span>
+                    <ToggleGroup
+                        type="single"
+                        value={target}
+                        onValueChange={(value) => {
+                            if (value === "working-tree" || value === "branch") changeTarget(value);
+                        }}
+                        className="bg-muted/60 inline-flex h-8 items-center gap-0.5 rounded-md p-0.5"
+                    >
+                        <ToggleGroupItem
+                            value="working-tree"
+                            aria-label="Compare to working tree"
+                            className="text-muted-foreground hover:bg-card/60 hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground h-7 rounded-[5px] border-0 bg-transparent px-2.5 text-[11.5px] font-medium tracking-tight transition-colors data-[state=on]:shadow-sm"
+                        >
+                            Working tree
+                        </ToggleGroupItem>
+                        <ToggleGroupItem
+                            value="branch"
+                            aria-label="Compare to branch"
+                            className="text-muted-foreground hover:bg-card/60 hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground h-7 rounded-[5px] border-0 bg-transparent px-2.5 text-[11.5px] font-medium tracking-tight transition-colors data-[state=on]:shadow-sm"
+                        >
+                            Branch
+                        </ToggleGroupItem>
+                    </ToggleGroup>
+                    {target === "branch" ? (
+                        <Select value={selectedTargetRef} onValueChange={onTargetRefChange}>
+                            <SelectTrigger
+                                aria-label="Target branch"
+                                title={`Target branch: ${selectedTargetRef}`}
+                                className="bg-muted/60 text-foreground/80 h-7 w-auto max-w-[220px] justify-start gap-1.5 border-0 px-2 font-mono text-[11.5px] shadow-none [&>span]:max-w-[160px]"
+                            >
+                                <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="start">
+                                {branchOptions.map((branch) => (
+                                    <SelectItem
+                                        key={branch.name}
+                                        value={branch.name}
+                                        className="font-mono text-[11.5px]"
+                                    >
+                                        {branch.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : null}
                     {payload.head ? (
                         <span
                             className="text-muted-foreground inline-flex items-center gap-1 font-mono text-[11.5px]"

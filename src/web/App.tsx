@@ -83,8 +83,13 @@ export default function App() {
     const [payload, setPayload] = useState<DiffPayload | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isReloading, setIsReloading] = useState(false);
+    const [targetRef, setTargetRef] = useState<string | null>(null);
     const [viewMode, setViewMode] = usePersistedState<ViewMode>("prettydiff:view", "unified");
     const [wrap, setWrap] = usePersistedState<boolean>("prettydiff:wrap", false);
+    const [target, setTarget] = usePersistedState<"working-tree" | "branch">(
+        "prettydiff:target",
+        "working-tree",
+    );
     const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
     const [activePath, setActivePath] = useState<string | null>(null);
 
@@ -117,7 +122,7 @@ export default function App() {
                 setMountReady(false);
                 setLargeDiffHint(null);
             }
-            fetchDiff()
+            fetchDiff({ target, targetRef })
                 .then(async (p) => {
                     const renderMeta = buildRenderMeta(p.files);
                     if (mode === "initial") {
@@ -185,7 +190,7 @@ export default function App() {
                     if (mode === "reload") setIsReloading(false);
                 });
         },
-        [setComments],
+        [setComments, target, targetRef],
     );
 
     useEffect(() => {
@@ -554,12 +559,20 @@ export default function App() {
                 allExpanded={allExpanded}
                 onReload={reload}
                 isReloading={isReloading}
+                target={target}
+                onTargetChange={setTarget}
+                targetRef={targetRef ?? payload.targetRef}
+                onTargetRefChange={setTargetRef}
                 showComments={showCommentsSidebar}
                 onShowCommentsChange={setShowCommentsSidebar}
                 commentCount={totalCommentCount}
             />
             {payload.files.length === 0 ? (
-                <EmptyState kind="empty" title="No changes" message="Working tree matches HEAD." />
+                <EmptyState
+                    kind="empty"
+                    title="No changes"
+                    message="Selected diff has no changes."
+                />
             ) : (
                 <div
                     className="relative grid min-h-0 flex-1 overflow-hidden"

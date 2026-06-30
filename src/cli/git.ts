@@ -4,7 +4,7 @@ import path from "node:path";
 
 import parseDiffLib from "parse-diff";
 
-import type { DiffPayload, ParsedFile, FileStatus } from "./types.js";
+import type { BranchRef, DiffOptions, DiffPayload, ParsedFile, FileStatus } from "./types.js";
 
 const NULL_DEVICE = process.platform === "win32" ? "NUL" : "/dev/null";
 const MAX_UNTRACKED_BYTES = 512 * 1024;
@@ -62,6 +62,34 @@ async function getBranch(cwd: string): Promise<string> {
     }
 }
 
+async function getBranches(cwd: string, currentBranch: string): Promise<BranchRef[]> {
+    try {
+        const r = await run(
+            "git",
+            ["for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes"],
+            cwd,
+        );
+        const seen = new Set<string>();
+        const branches: BranchRef[] = [];
+        for (const line of r.stdout.split("\n")) {
+            const name = line.trim();
+            if (!name || name.endsWith("/HEAD") || seen.has(name)) continue;
+            seen.add(name);
+            branches.push({ name, ...(name === currentBranch ? { current: true } : {}) });
+        }
+        if (currentBranch && currentBranch !== "HEAD" && currentBranch !== "(detached)") {
+            if (!seen.has(currentBranch)) {
+                branches.unshift({ name: currentBranch, current: true });
+            }
+        }
+        return branches.sort((a, b) => a.name.localeCompare(b.name));
+    } catch {
+        return currentBranch && currentBranch !== "(detached)"
+            ? [{ name: currentBranch, current: true }]
+            : [{ name: "HEAD", current: true }];
+    }
+}
+
 async function getHead(cwd: string): Promise<string> {
     try {
         const r = await run("git", ["rev-parse", "--short", "HEAD"], cwd);
@@ -71,19 +99,28 @@ async function getHead(cwd: string): Promise<string> {
     }
 }
 
-async function getTrackedDiff(cwd: string): Promise<string> {
+async function getTrackedDiff(cwd: string, options: DiffOptions): Promise<string> {
+    const targetArgs = options.target === "working-tree" ? [] : [options.targetRef ?? "HEAD"];
     const r = await run(
         "git",
-        ["diff", "HEAD", "--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/"],
+        [
+            "diff",
+            "HEAD",
+            ...targetArgs,
+            "--no-color",
+            "--no-ext-diff",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
+        ],
         cwd,
     );
     return r.stdout;
 }
 
-async function getFileAtHead(cwd: string, relPath: string): Promise<string | null> {
+async function getFileAtRef(cwd: string, ref: string, relPath: string): Promise<string | null> {
     try {
-        // exit 128 means the path doesn't exist at HEAD (e.g. an added file).
-        const r = await run("git", ["show", `HEAD:${relPath}`], cwd, [0, 128]);
+        // exit 128 means the path doesn't exist at the ref (e.g. an added file).
+        const r = await run("git", ["show", `${ref}:${relPath}`], cwd, [0, 128]);
         return r.code === 0 ? r.stdout : null;
     } catch {
         return null;
@@ -108,14 +145,22 @@ interface FileSides {
     sizeBytes: number;
 }
 
-async function loadFileSides(cwd: string, file: ParsedFile): Promise<FileSides | "too-large"> {
+async function loadFileSides(
+    cwd: string,
+    file: ParsedFile,
+    options: DiffOptions,
+): Promise<FileSides | "too-large"> {
     const oldRef = file.oldPath ?? file.path;
     const needsOld = file.status !== "added" && file.status !== "untracked";
     const needsNew = file.status !== "deleted";
 
     const [oldRaw, newRaw] = await Promise.all([
-        needsOld ? getFileAtHead(cwd, oldRef) : Promise.resolve(""),
-        needsNew ? readWorkingTreeFile(cwd, file.path) : Promise.resolve(""),
+        needsOld ? getFileAtRef(cwd, "HEAD", oldRef) : Promise.resolve(""),
+        needsNew
+            ? options.target === "working-tree"
+                ? readWorkingTreeFile(cwd, file.path)
+                : getFileAtRef(cwd, options.targetRef ?? "HEAD", file.path)
+            : Promise.resolve(""),
     ]);
 
     const oldContents = oldRaw ?? "";
@@ -207,15 +252,40 @@ function normalizePath(parsed: parseDiffLib.File): { path: string; oldPath?: str
     return { path: to ?? from ?? "(unknown)" };
 }
 
-export async function getDiffPayload(cwd: string): Promise<DiffPayload | null> {
+async function resolveTargetRef(
+    cwd: string,
+    requestedTargetRef: string | undefined,
+    currentBranch: string,
+): Promise<string> {
+    const fallback = currentBranch && currentBranch !== "(detached)" ? currentBranch : "HEAD";
+    const targetRef = requestedTargetRef?.trim() || fallback;
+    try {
+        await run("git", ["rev-parse", "--verify", `${targetRef}^{commit}`], cwd);
+        return targetRef;
+    } catch {
+        return fallback;
+    }
+}
+
+export async function getDiffPayload(
+    cwd: string,
+    requestedOptions: Partial<DiffOptions> = {},
+): Promise<DiffPayload | null> {
     const repoRoot = await getRepoRoot(cwd);
     if (!repoRoot) return null;
 
-    const [trackedPatch, untrackedList, branch, head] = await Promise.all([
-        getTrackedDiff(repoRoot),
-        getUntrackedFiles(repoRoot),
-        getBranch(repoRoot),
-        getHead(repoRoot),
+    const [branch, head] = await Promise.all([getBranch(repoRoot), getHead(repoRoot)]);
+    const target = requestedOptions.target ?? "working-tree";
+    const targetRef =
+        target === "branch"
+            ? await resolveTargetRef(repoRoot, requestedOptions.targetRef, branch)
+            : undefined;
+    const options: DiffOptions = { target, ...(targetRef ? { targetRef } : {}) };
+
+    const [trackedPatch, untrackedList, branches] = await Promise.all([
+        getTrackedDiff(repoRoot, options),
+        target === "working-tree" ? getUntrackedFiles(repoRoot) : Promise.resolve([]),
+        getBranches(repoRoot, branch),
     ]);
 
     const synthesized = await Promise.all(
@@ -267,7 +337,7 @@ export async function getDiffPayload(cwd: string): Promise<DiffPayload | null> {
     await Promise.all(
         files.map(async (file) => {
             if (file.skipped || file.binary) return;
-            const sides = await loadFileSides(repoRoot, file);
+            const sides = await loadFileSides(repoRoot, file, options);
             if (sides === "too-large") {
                 file.rawPatch = "";
                 file.skipped = { reason: "too-large" };
@@ -281,7 +351,10 @@ export async function getDiffPayload(cwd: string): Promise<DiffPayload | null> {
     return {
         repoRoot,
         branch,
+        branches,
         head,
+        target,
+        ...(targetRef ? { targetRef } : {}),
         generatedAt: new Date().toISOString(),
         files,
     };
