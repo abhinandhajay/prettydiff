@@ -1,9 +1,12 @@
 import { commentIndicatorDomId } from "@/components/CommentIndicator";
-import { CommentsSidebar } from "@/components/CommentsSidebar";
 import { EmptyState } from "@/components/EmptyState";
 import { FileCard } from "@/components/FileCard";
-import { FileTreeSidebar } from "@/components/FileTreeSidebar";
 import { Header, HeaderShell } from "@/components/Header";
+import {
+    CollapsedReviewRail,
+    ReviewSidebar,
+    type ReviewSidebarTab,
+} from "@/components/ReviewSidebar";
 import {
     allCommentIds,
     buildFileIndex,
@@ -34,8 +37,6 @@ const EMPTY_PATCH_INDEX: PatchLineIndex = {
 const HUGE_DIFF_LINE_THRESHOLD = 5000;
 const ESTIMATED_DIFF_HEADER_HEIGHT = 56;
 const ESTIMATED_DIFF_LINE_HEIGHT = 18;
-// The comments sidebar floats in an overlay sized to match the grid track it reserves.
-const COMMENTS_SIDEBAR_WIDTH = "min(340px, 28vw)";
 
 interface DiffFileRenderMeta {
     estimatedHeight: number;
@@ -97,9 +98,13 @@ export default function App() {
     const [activePath, setActivePath] = useState<string | null>(null);
 
     const [comments, setComments] = usePersistedState<CommentMap>("prettydiff:comments", {});
-    const [showCommentsSidebar, setShowCommentsSidebar] = usePersistedState<boolean>(
-        "prettydiff:comments-open",
+    const [leftPanelOpen, setLeftPanelOpen] = usePersistedState<boolean>(
+        "prettydiff:left-panel-open",
         true,
+    );
+    const [leftPanelTab, setLeftPanelTab] = usePersistedState<ReviewSidebarTab>(
+        "prettydiff:left-panel-tab",
+        "changes",
     );
     const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set());
     const [activeDraft, setActiveDraft] = useState<DraftLine | null>(null);
@@ -356,9 +361,10 @@ export default function App() {
                 return next;
             });
             setActiveDraft(null);
-            setShowCommentsSidebar(true);
+            setLeftPanelOpen(true);
+            setLeftPanelTab("comments");
         },
-        [activeDraft, setComments, setShowCommentsSidebar],
+        [activeDraft, setComments, setLeftPanelOpen, setLeftPanelTab],
     );
 
     const editComment = useCallback(
@@ -427,10 +433,11 @@ export default function App() {
 
     const focusComment = useCallback(
         (id: string) => {
-            setShowCommentsSidebar(true);
+            setLeftPanelOpen(true);
+            setLeftPanelTab("comments");
             setScrollToCommentId(id);
         },
-        [setShowCommentsSidebar],
+        [setLeftPanelOpen, setLeftPanelTab],
     );
 
     const clearScrollTarget = useCallback(() => setScrollToCommentId(null), []);
@@ -584,9 +591,6 @@ export default function App() {
                 onTargetChange={setTarget}
                 targetRef={targetRef ?? payload.targetRef}
                 onTargetRefChange={setTargetRef}
-                showComments={showCommentsSidebar}
-                onShowCommentsChange={setShowCommentsSidebar}
-                commentCount={totalCommentCount}
             />
             <div className="relative flex min-h-0 flex-1 overflow-hidden">
                 {payload.files.length === 0 ? (
@@ -596,20 +600,44 @@ export default function App() {
                         message="Selected diff has no changes."
                     />
                 ) : (
-                    <div
-                        className="relative grid min-h-0 flex-1 overflow-hidden"
-                        style={{
-                            gridTemplateColumns: `minmax(0, min(276px, 24vw)) minmax(0, 1fr) ${
-                                showCommentsSidebar ? COMMENTS_SIDEBAR_WIDTH : "0px"
-                            }`,
-                        }}
-                    >
-                        <FileTreeSidebar
-                            files={sortedFiles}
-                            activePath={activePath}
-                            onScrollTo={scrollToFile}
-                        />
-                        <main ref={mainRef} className="bg-card min-h-0 overflow-y-auto">
+                    <div className="relative flex min-h-0 flex-1 overflow-hidden">
+                        <div
+                            className="h-full shrink-0 overflow-hidden"
+                            style={{
+                                width: leftPanelOpen ? "clamp(260px, 28vw, 340px)" : "52px",
+                                transition: "width 280ms cubic-bezier(0.32, 0.72, 0, 1)",
+                            }}
+                        >
+                            {leftPanelOpen ? (
+                                <ReviewSidebar
+                                    open={leftPanelOpen}
+                                    activeTab={leftPanelTab}
+                                    onOpenChange={setLeftPanelOpen}
+                                    onTabChange={setLeftPanelTab}
+                                    files={sortedFiles}
+                                    activePath={activePath}
+                                    onScrollToFile={scrollToFile}
+                                    comments={comments}
+                                    totalCommentCount={totalCommentCount}
+                                    selectedCommentIds={selectedCommentIds}
+                                    onToggleSelectedComment={toggleSelected}
+                                    onToggleFileComments={toggleFileSelection}
+                                    onEditComment={editComment}
+                                    onDeleteComment={deleteComment}
+                                    onCopyComments={copySelected}
+                                    scrollToCommentId={scrollToCommentId}
+                                    onCommentScrollHandled={clearScrollTarget}
+                                    onJumpToDiffComment={jumpToDiffComment}
+                                />
+                            ) : (
+                                <CollapsedReviewRail
+                                    files={sortedFiles}
+                                    totalCommentCount={totalCommentCount}
+                                    onOpen={() => setLeftPanelOpen(true)}
+                                />
+                            )}
+                        </div>
+                        <main ref={mainRef} className="bg-card min-w-0 flex-1 overflow-y-auto">
                             <div>
                                 {sortedFiles.map((f) => {
                                     const meta = fileRenderMeta.byPath.get(f.path);
@@ -641,25 +669,6 @@ export default function App() {
                                 })}
                             </div>
                         </main>
-                        <div
-                            className="pointer-events-none absolute inset-y-0 right-0 z-10 overflow-hidden"
-                            style={{ width: COMMENTS_SIDEBAR_WIDTH }}
-                        >
-                            <CommentsSidebar
-                                open={showCommentsSidebar}
-                                comments={comments}
-                                totalCount={totalCommentCount}
-                                selectedIds={selectedCommentIds}
-                                onToggleSelected={toggleSelected}
-                                onToggleFile={toggleFileSelection}
-                                onEdit={editComment}
-                                onDelete={deleteComment}
-                                onCopy={copySelected}
-                                scrollToId={scrollToCommentId}
-                                onScrollHandled={clearScrollTarget}
-                                onJumpToDiff={jumpToDiffComment}
-                            />
-                        </div>
                     </div>
                 )}
                 {overlay}

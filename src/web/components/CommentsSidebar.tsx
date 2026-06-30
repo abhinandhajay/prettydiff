@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { CommentLineType, CommentMap, DiffComment } from "@/lib/types";
 
-interface Props {
+interface CommentsPanelProps {
     comments: CommentMap;
     totalCount: number;
     selectedIds: Set<string>;
@@ -34,6 +34,9 @@ interface Props {
     scrollToId: string | null;
     onScrollHandled: () => void;
     onJumpToDiff: (id: string) => void;
+}
+
+interface Props extends CommentsPanelProps {
     open: boolean;
 }
 
@@ -73,7 +76,7 @@ function fileHeaderCheckState(
     return "indeterminate";
 }
 
-export function CommentsSidebar({
+export function CommentsPanelContent({
     comments,
     totalCount,
     selectedIds,
@@ -85,8 +88,7 @@ export function CommentsSidebar({
     scrollToId,
     onScrollHandled,
     onJumpToDiff,
-    open,
-}: Props) {
+}: CommentsPanelProps) {
     const groups = useMemo(() => groupByFile(comments), [comments]);
     const selectedCount = useMemo(() => {
         let n = 0;
@@ -138,33 +140,7 @@ export function CommentsSidebar({
     }, [scrollToId, onScrollHandled]);
 
     return (
-        <aside
-            data-state={open ? "open" : "closed"}
-            className={cn(
-                "bg-sidebar text-sidebar-foreground border-sidebar-border pointer-events-auto flex h-full w-full min-w-0 flex-col overflow-hidden border-l",
-                "transition-[translate,opacity] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]",
-                "data-[state=closed]:translate-x-full data-[state=closed]:opacity-0",
-                "data-[state=closed]:pointer-events-none",
-            )}
-            aria-hidden={!open}
-        >
-            <div className="border-sidebar-border flex h-10 shrink-0 items-center justify-between border-b px-3">
-                <div className="flex items-center gap-2">
-                    <span className="bg-muted-foreground/80 size-1.5 rounded-full" aria-hidden />
-                    <span className="text-muted-foreground text-[10px] font-medium tracking-[0.13em] uppercase">
-                        Comments
-                    </span>
-                    {totalCount > 0 ? (
-                        <Badge
-                            variant="outline"
-                            className="ml-1 font-mono text-[10.5px] tabular-nums"
-                        >
-                            {totalCount}
-                        </Badge>
-                    ) : null}
-                </div>
-            </div>
-
+        <>
             {totalCount === 0 ? (
                 <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
                     <MessageSquareOff className="size-5 opacity-60" />
@@ -238,6 +214,39 @@ export function CommentsSidebar({
                     </span>
                 </Button>
             </div>
+        </>
+    );
+}
+
+export function CommentsSidebar({ open, ...props }: Props) {
+    return (
+        <aside
+            data-state={open ? "open" : "closed"}
+            className={cn(
+                "bg-sidebar text-sidebar-foreground border-sidebar-border pointer-events-auto flex h-full w-full min-w-0 flex-col overflow-hidden border-l",
+                "transition-[translate,opacity] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                "data-[state=closed]:translate-x-full data-[state=closed]:opacity-0",
+                "data-[state=closed]:pointer-events-none",
+            )}
+            aria-hidden={!open}
+        >
+            <div className="border-sidebar-border flex h-10 shrink-0 items-center justify-between border-b px-3">
+                <div className="flex items-center gap-2">
+                    <span className="bg-muted-foreground/80 size-1.5 rounded-full" aria-hidden />
+                    <span className="text-muted-foreground text-[10px] font-medium tracking-[0.13em] uppercase">
+                        Comments
+                    </span>
+                    {props.totalCount > 0 ? (
+                        <Badge
+                            variant="outline"
+                            className="ml-1 font-mono text-[10.5px] tabular-nums"
+                        >
+                            {props.totalCount}
+                        </Badge>
+                    ) : null}
+                </div>
+            </div>
+            <CommentsPanelContent {...props} />
         </aside>
     );
 }
