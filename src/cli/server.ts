@@ -21,7 +21,9 @@ export async function startServer(repoRoot: string, port: number): Promise<Start
     const app = new Hono();
 
     app.get("/api/diff", async (c) => {
-        const payload = await getDiffPayload(repoRoot);
+        const target = c.req.query("target") === "branch" ? "branch" : "working-tree";
+        const targetRef = c.req.query("targetRef") || undefined;
+        const payload = await getDiffPayload(repoRoot, { target, targetRef });
         if (!payload) return c.json({ error: "not a git repository" }, 500);
         return c.json(payload);
     });

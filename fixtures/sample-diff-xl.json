@@ -1,7 +1,20 @@
 {
     "repoRoot": "/example/xl-repo",
     "branch": "perf-test",
+    "branches": [
+        {
+            "name": "main"
+        },
+        {
+            "name": "origin/main"
+        },
+        {
+            "name": "perf-test",
+            "current": true
+        }
+    ],
     "head": "deadbeef0123456789abcdef0123456789abcdef",
+    "target": "working-tree",
     "generatedAt": "2026-05-19T00:00:00.000Z",
     "files": [
         {

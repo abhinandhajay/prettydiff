@@ -1,5 +1,15 @@
 export type FileStatus = "added" | "modified" | "deleted" | "renamed" | "untracked";
 
+export interface BranchRef {
+    name: string;
+    current?: boolean;
+}
+
+export interface DiffOptions {
+    target: "working-tree" | "branch";
+    targetRef?: string;
+}
+
 export interface ParsedFile {
     path: string;
     oldPath?: string;
@@ -16,7 +26,10 @@ export interface ParsedFile {
 export interface DiffPayload {
     repoRoot: string;
     branch: string;
+    branches: BranchRef[];
     head: string;
+    target: DiffOptions["target"];
+    targetRef?: string;
     generatedAt: string;
     files: ParsedFile[];
 }
