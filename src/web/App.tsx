@@ -83,12 +83,15 @@ export default function App() {
     const [payload, setPayload] = useState<DiffPayload | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isReloading, setIsReloading] = useState(false);
-    const [targetRef, setTargetRef] = useState<string | null>(null);
     const [viewMode, setViewMode] = usePersistedState<ViewMode>("prettydiff:view", "unified");
     const [wrap, setWrap] = usePersistedState<boolean>("prettydiff:wrap", false);
     const [target, setTarget] = usePersistedState<"working-tree" | "branch">(
         "prettydiff:target",
         "working-tree",
+    );
+    const [targetRef, setTargetRef] = usePersistedState<string | null>(
+        "prettydiff:targetRef",
+        null,
     );
     const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
     const [activePath, setActivePath] = useState<string | null>(null);
@@ -109,21 +112,30 @@ export default function App() {
     const [mountReady, setMountReady] = useState(false);
 
     const mainRef = useRef<HTMLElement>(null);
+    const loadIdRef = useRef(0);
 
     const commentsRef = useRef(comments);
     useEffect(() => {
         commentsRef.current = comments;
     }, [comments]);
 
+    useEffect(() => {
+        if (target === "branch" && !targetRef) setTarget("working-tree");
+    }, [setTarget, target, targetRef]);
+
     const loadDiff = useCallback(
         (mode: "initial" | "reload") => {
+            const loadId = ++loadIdRef.current;
+            const requestTarget = target === "branch" && !targetRef ? "working-tree" : target;
             if (mode === "reload") setIsReloading(true);
             if (mode === "initial") {
+                setIsReloading(false);
                 setMountReady(false);
                 setLargeDiffHint(null);
             }
-            fetchDiff({ target, targetRef })
+            fetchDiff({ target: requestTarget, targetRef })
                 .then(async (p) => {
+                    if (loadId !== loadIdRef.current) return;
                     const renderMeta = buildRenderMeta(p.files);
                     if (mode === "initial") {
                         if (shouldShowLargeDiffHint(renderMeta.totalLines)) {
@@ -138,10 +150,12 @@ export default function App() {
                                 });
                             });
                             await yieldForPaint();
+                            if (loadId !== loadIdRef.current) return;
                         }
                     }
                     const indexByPath = patchIndexesFromMeta(renderMeta.byPath);
                     const stamped = markStaleComments(commentsRef.current, p.files, indexByPath);
+                    if (loadId !== loadIdRef.current) return;
                     setPayload(p);
                     setFileRenderMeta(renderMeta);
                     if (stamped !== commentsRef.current) {
@@ -179,6 +193,7 @@ export default function App() {
                     }
                 })
                 .catch((e) => {
+                    if (loadId !== loadIdRef.current) return;
                     if (mode === "initial") {
                         setLargeDiffHint(null);
                         setError(e?.message ?? String(e));
@@ -187,6 +202,7 @@ export default function App() {
                     }
                 })
                 .finally(() => {
+                    if (loadId !== loadIdRef.current) return;
                     if (mode === "reload") setIsReloading(false);
                 });
         },
