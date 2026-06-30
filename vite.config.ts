@@ -59,6 +59,17 @@ function applyDevFixtureOptions(payload: DevFixturePayload, url: URL): DevFixtur
     };
 }
 
+function fixtureFor(url: URL): string {
+    switch (url.searchParams.get("fixture")) {
+        case "empty":
+            return "sample-diff-empty.json";
+        case "xl":
+            return "sample-diff-xl.json";
+        default:
+            return "sample-diff.json";
+    }
+}
+
 export default defineConfig({
     root: here,
     plugins: [
@@ -70,10 +81,7 @@ export default defineConfig({
                 server.middlewares.use(async (req, res, next) => {
                     if (req.url && req.url.startsWith("/api/diff")) {
                         const url = new URL(req.url, "http://localhost");
-                        const fixture =
-                            url.searchParams.get("fixture") === "xl"
-                                ? "sample-diff-xl.json"
-                                : "sample-diff.json";
+                        const fixture = fixtureFor(url);
                         try {
                             const text = await readFile(
                                 path.join(here, "fixtures", fixture),

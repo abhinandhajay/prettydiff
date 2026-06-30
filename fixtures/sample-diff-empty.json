@@ -1,0 +1,20 @@
+{
+    "repoRoot": "/example/repo",
+    "branch": "main",
+    "branches": [
+        {
+            "name": "feature/header-polish"
+        },
+        {
+            "name": "main",
+            "current": true
+        },
+        {
+            "name": "origin/main"
+        }
+    ],
+    "head": "abc1234",
+    "target": "working-tree",
+    "generatedAt": "2026-05-10T12:00:00.000Z",
+    "files": []
+}

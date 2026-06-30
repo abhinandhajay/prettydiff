@@ -3,7 +3,7 @@ import { CommentsSidebar } from "@/components/CommentsSidebar";
 import { EmptyState } from "@/components/EmptyState";
 import { FileCard } from "@/components/FileCard";
 import { FileTreeSidebar } from "@/components/FileTreeSidebar";
-import { Header } from "@/components/Header";
+import { Header, HeaderShell } from "@/components/Header";
 import {
     allCommentIds,
     buildFileIndex,
@@ -543,7 +543,12 @@ export default function App() {
     );
 
     if (!payload) {
-        return <div className="bg-background relative flex min-h-screen flex-col">{overlay}</div>;
+        return (
+            <div className="bg-background flex h-screen flex-col overflow-hidden">
+                <HeaderShell />
+                <div className="relative min-h-0 flex-1">{overlay}</div>
+            </div>
+        );
     }
 
     return (
@@ -567,78 +572,82 @@ export default function App() {
                 onShowCommentsChange={setShowCommentsSidebar}
                 commentCount={totalCommentCount}
             />
-            {payload.files.length === 0 ? (
-                <EmptyState
-                    kind="empty"
-                    title="No changes"
-                    message="Selected diff has no changes."
-                />
-            ) : (
-                <div
-                    className="relative grid min-h-0 flex-1 overflow-hidden"
-                    style={{
-                        gridTemplateColumns: `minmax(0, min(276px, 24vw)) minmax(0, 1fr) ${
-                            showCommentsSidebar ? COMMENTS_SIDEBAR_WIDTH : "0px"
-                        }`,
-                    }}
-                >
-                    <FileTreeSidebar
-                        files={sortedFiles}
-                        activePath={activePath}
-                        onScrollTo={scrollToFile}
+            <div className="relative flex min-h-0 flex-1 overflow-hidden">
+                {payload.files.length === 0 ? (
+                    <EmptyState
+                        kind="empty"
+                        title="No changes"
+                        message="Selected diff has no changes."
                     />
-                    <main ref={mainRef} className="bg-card min-h-0 overflow-y-auto">
-                        <div>
-                            {sortedFiles.map((f) => {
-                                const meta = fileRenderMeta.byPath.get(f.path);
-                                return (
-                                    <FileCard
-                                        key={f.path}
-                                        file={f}
-                                        open={openMap[f.path] ?? true}
-                                        onOpenChange={setOpen}
-                                        viewMode={viewMode}
-                                        wrap={wrap}
-                                        comments={comments[f.path] ?? EMPTY_COMMENTS}
-                                        patchIndex={meta?.patchIndex ?? EMPTY_PATCH_INDEX}
-                                        estimatedHeight={meta?.estimatedHeight ?? 0}
-                                        activeDraft={
-                                            activeDraft?.filePath === f.path ? activeDraft : null
-                                        }
-                                        onRequestDraft={requestDraft}
-                                        onCancelDraft={cancelDraft}
-                                        onSaveDraft={saveDraft}
-                                        onFocusComment={focusComment}
-                                        onEditComment={editComment}
-                                        onDeleteComment={deleteComment}
-                                        flashCommentId={diffFlashCommentId}
-                                    />
-                                );
-                            })}
-                        </div>
-                    </main>
+                ) : (
                     <div
-                        className="pointer-events-none absolute inset-y-0 right-0 z-10 overflow-hidden"
-                        style={{ width: COMMENTS_SIDEBAR_WIDTH }}
+                        className="relative grid min-h-0 flex-1 overflow-hidden"
+                        style={{
+                            gridTemplateColumns: `minmax(0, min(276px, 24vw)) minmax(0, 1fr) ${
+                                showCommentsSidebar ? COMMENTS_SIDEBAR_WIDTH : "0px"
+                            }`,
+                        }}
                     >
-                        <CommentsSidebar
-                            open={showCommentsSidebar}
-                            comments={comments}
-                            totalCount={totalCommentCount}
-                            selectedIds={selectedCommentIds}
-                            onToggleSelected={toggleSelected}
-                            onToggleFile={toggleFileSelection}
-                            onEdit={editComment}
-                            onDelete={deleteComment}
-                            onCopy={copySelected}
-                            scrollToId={scrollToCommentId}
-                            onScrollHandled={clearScrollTarget}
-                            onJumpToDiff={jumpToDiffComment}
+                        <FileTreeSidebar
+                            files={sortedFiles}
+                            activePath={activePath}
+                            onScrollTo={scrollToFile}
                         />
+                        <main ref={mainRef} className="bg-card min-h-0 overflow-y-auto">
+                            <div>
+                                {sortedFiles.map((f) => {
+                                    const meta = fileRenderMeta.byPath.get(f.path);
+                                    return (
+                                        <FileCard
+                                            key={f.path}
+                                            file={f}
+                                            open={openMap[f.path] ?? true}
+                                            onOpenChange={setOpen}
+                                            viewMode={viewMode}
+                                            wrap={wrap}
+                                            comments={comments[f.path] ?? EMPTY_COMMENTS}
+                                            patchIndex={meta?.patchIndex ?? EMPTY_PATCH_INDEX}
+                                            estimatedHeight={meta?.estimatedHeight ?? 0}
+                                            activeDraft={
+                                                activeDraft?.filePath === f.path
+                                                    ? activeDraft
+                                                    : null
+                                            }
+                                            onRequestDraft={requestDraft}
+                                            onCancelDraft={cancelDraft}
+                                            onSaveDraft={saveDraft}
+                                            onFocusComment={focusComment}
+                                            onEditComment={editComment}
+                                            onDeleteComment={deleteComment}
+                                            flashCommentId={diffFlashCommentId}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </main>
+                        <div
+                            className="pointer-events-none absolute inset-y-0 right-0 z-10 overflow-hidden"
+                            style={{ width: COMMENTS_SIDEBAR_WIDTH }}
+                        >
+                            <CommentsSidebar
+                                open={showCommentsSidebar}
+                                comments={comments}
+                                totalCount={totalCommentCount}
+                                selectedIds={selectedCommentIds}
+                                onToggleSelected={toggleSelected}
+                                onToggleFile={toggleFileSelection}
+                                onEdit={editComment}
+                                onDelete={deleteComment}
+                                onCopy={copySelected}
+                                scrollToId={scrollToCommentId}
+                                onScrollHandled={clearScrollTarget}
+                                onJumpToDiff={jumpToDiffComment}
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
-            {overlay}
+                )}
+                {overlay}
+            </div>
         </div>
     );
 }

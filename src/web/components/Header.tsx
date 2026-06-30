@@ -69,6 +69,23 @@ function Divider() {
     return <span aria-hidden className="bg-border/80 h-4 w-px shrink-0" />;
 }
 
+export function HeaderShell() {
+    return (
+        <header className="bg-background isolate z-20 flex h-12 shrink-0 items-center justify-between gap-3 border-b px-3">
+            <div className="flex min-w-0 items-center gap-3">
+                <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground bg-card border-border inline-flex size-7 items-center justify-center rounded-md border">
+                        <LogoMark className="size-4" />
+                    </span>
+                    <span className="text-foreground text-[14px] font-semibold tracking-tight">
+                        prettydiff
+                    </span>
+                </div>
+            </div>
+        </header>
+    );
+}
+
 export function Header({
     payload,
     viewMode,
