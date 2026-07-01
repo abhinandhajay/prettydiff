@@ -267,11 +267,3 @@ export function FileTreePanelContent({ files, activePath, onScrollTo }: Props) {
         </>
     );
 }
-
-export function FileTreeSidebar(props: Props) {
-    return (
-        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full min-h-0 flex-col overflow-hidden border-r">
-            <FileTreePanelContent {...props} />
-        </aside>
-    );
-}

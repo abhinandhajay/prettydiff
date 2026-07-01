@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { Files, MessageSquare, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useMemo } from "react";
 
 import type { CommentMap, ParsedFile } from "@/lib/types";
 import type * as React from "react";
@@ -36,12 +37,7 @@ interface CollapsedReviewRailProps {
     files: ParsedFile[];
     totalCommentCount: number;
     onOpen: () => void;
-    onResizeStart: (
-        event:
-            | React.PointerEvent<HTMLButtonElement>
-            | React.MouseEvent<HTMLButtonElement>
-            | React.TouchEvent<HTMLButtonElement>,
-    ) => void;
+    onResizeStart: (event: React.PointerEvent<HTMLButtonElement>) => void;
 }
 
 export function CollapsedReviewRail({
@@ -50,12 +46,16 @@ export function CollapsedReviewRail({
     onOpen,
     onResizeStart,
 }: CollapsedReviewRailProps) {
-    const totals = files.reduce(
-        (acc, file) => ({
-            additions: acc.additions + file.additions,
-            deletions: acc.deletions + file.deletions,
-        }),
-        { additions: 0, deletions: 0 },
+    const totals = useMemo(
+        () =>
+            files.reduce(
+                (acc, file) => ({
+                    additions: acc.additions + file.additions,
+                    deletions: acc.deletions + file.deletions,
+                }),
+                { additions: 0, deletions: 0 },
+            ),
+        [files],
     );
 
     return (
@@ -107,8 +107,6 @@ export function CollapsedReviewRail({
                 aria-label="Resize sidebar"
                 title="Resize sidebar"
                 onPointerDown={onResizeStart}
-                onMouseDown={onResizeStart}
-                onTouchStart={onResizeStart}
                 onClick={onOpen}
                 className="absolute inset-y-0 right-0 z-20 w-4 cursor-ew-resize appearance-none border-0 bg-transparent p-0"
             />

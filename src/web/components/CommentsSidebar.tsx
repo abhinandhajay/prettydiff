@@ -36,10 +36,6 @@ interface CommentsPanelProps {
     onJumpToDiff: (id: string) => void;
 }
 
-interface Props extends CommentsPanelProps {
-    open: boolean;
-}
-
 interface FileGroup {
     path: string;
     comments: DiffComment[];
@@ -215,39 +211,6 @@ export function CommentsPanelContent({
                 </Button>
             </div>
         </>
-    );
-}
-
-export function CommentsSidebar({ open, ...props }: Props) {
-    return (
-        <aside
-            data-state={open ? "open" : "closed"}
-            className={cn(
-                "bg-sidebar text-sidebar-foreground border-sidebar-border pointer-events-auto flex h-full w-full min-w-0 flex-col overflow-hidden border-l",
-                "transition-[translate,opacity] duration-280 ease-[cubic-bezier(0.32,0.72,0,1)]",
-                "data-[state=closed]:translate-x-full data-[state=closed]:opacity-0",
-                "data-[state=closed]:pointer-events-none",
-            )}
-            aria-hidden={!open}
-        >
-            <div className="border-sidebar-border flex h-10 shrink-0 items-center justify-between border-b px-3">
-                <div className="flex items-center gap-2">
-                    <span className="bg-muted-foreground/80 size-1.5 rounded-full" aria-hidden />
-                    <span className="text-muted-foreground text-[10px] font-medium tracking-[0.13em] uppercase">
-                        Comments
-                    </span>
-                    {props.totalCount > 0 ? (
-                        <Badge
-                            variant="outline"
-                            className="ml-1 font-mono text-[10.5px] tabular-nums"
-                        >
-                            {props.totalCount}
-                        </Badge>
-                    ) : null}
-                </div>
-            </div>
-            <CommentsPanelContent {...props} />
-        </aside>
     );
 }
 

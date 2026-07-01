@@ -26,6 +26,7 @@ import { flushSync } from "react-dom";
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
 import type { CommentMap, DiffComment, DiffPayload, DraftLine, ParsedFile } from "@/lib/types";
+import type * as React from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 
 const EMPTY_COMMENTS: DiffComment[] = [];
@@ -45,13 +46,6 @@ const LEFT_PANEL_COLLAPSE_TRIGGER_WIDTH = 104;
 const DEFAULT_LEFT_PANEL_WIDTH = 340;
 const MIN_LEFT_PANEL_WIDTH = 260;
 const MAX_LEFT_PANEL_WIDTH = 480;
-
-type LeftPanelDragStartEvent = {
-    clientX?: number;
-    touches?: { 0?: { clientX?: number }; length: number };
-    target?: EventTarget | null;
-    preventDefault?: () => void;
-};
 
 interface DiffFileRenderMeta {
     estimatedHeight: number;
@@ -77,12 +71,6 @@ function yieldForPaint(): Promise<void> {
 
 function clampLeftPanelWidth(width: number): number {
     return Math.min(MAX_LEFT_PANEL_WIDTH, Math.max(MIN_LEFT_PANEL_WIDTH, Math.round(width)));
-}
-
-function getDragClientX(event: LeftPanelDragStartEvent): number | null {
-    if (typeof event.clientX === "number") return event.clientX;
-    const touch = event.touches?.[0];
-    return typeof touch?.clientX === "number" ? touch.clientX : null;
 }
 
 function buildRenderMeta(files: ParsedFile[]): DiffRenderMeta {
@@ -168,12 +156,6 @@ export default function App() {
         commentsRef.current = comments;
     }, [comments]);
 
-    useEffect(() => {
-        if (leftPanelSize < MIN_LEFT_PANEL_WIDTH || leftPanelSize > MAX_LEFT_PANEL_WIDTH) {
-            setLeftPanelSize(DEFAULT_LEFT_PANEL_WIDTH);
-        }
-    }, [leftPanelSize, setLeftPanelSize]);
-
     const setReviewPanelOpen = useCallback(
         (open: boolean) => {
             setLeftPanelOpen(open);
@@ -207,7 +189,7 @@ export default function App() {
     );
 
     const startClosedPanelResize = useCallback(
-        (event: LeftPanelDragStartEvent) => {
+        (event: React.PointerEvent<HTMLButtonElement>) => {
             if (leftPanelOpen) return;
             closedPanelDragActiveRef.current = true;
 
@@ -216,10 +198,9 @@ export default function App() {
                 setLeftPanelSize(nextSize);
                 leftPanelRef.current?.resize(`${nextSize}px`);
             };
-            const startX = getDragClientX(event);
-            const startSize = startX === null ? MIN_LEFT_PANEL_WIDTH : clampLeftPanelWidth(startX);
+            const startSize = clampLeftPanelWidth(event.clientX);
 
-            event.preventDefault?.();
+            event.preventDefault();
             flushSync(() => {
                 setLeftPanelSize(startSize);
                 setLeftPanelOpen(true);
@@ -231,33 +212,16 @@ export default function App() {
             const handlePointerMove = (moveEvent: PointerEvent) => {
                 applySize(moveEvent.clientX);
             };
-            const handleMouseMove = (moveEvent: MouseEvent) => {
-                applySize(moveEvent.clientX);
-            };
-            const handleTouchMove = (moveEvent: TouchEvent) => {
-                const touch = moveEvent.touches[0];
-                if (touch) applySize(touch.clientX);
-            };
             const stopResize = () => {
                 closedPanelDragActiveRef.current = false;
                 window.removeEventListener("pointermove", handlePointerMove);
                 window.removeEventListener("pointerup", stopResize);
                 window.removeEventListener("pointercancel", stopResize);
-                window.removeEventListener("mousemove", handleMouseMove);
-                window.removeEventListener("mouseup", stopResize);
-                window.removeEventListener("touchmove", handleTouchMove);
-                window.removeEventListener("touchend", stopResize);
-                window.removeEventListener("touchcancel", stopResize);
             };
 
             window.addEventListener("pointermove", handlePointerMove);
             window.addEventListener("pointerup", stopResize);
             window.addEventListener("pointercancel", stopResize);
-            window.addEventListener("mousemove", handleMouseMove);
-            window.addEventListener("mouseup", stopResize);
-            window.addEventListener("touchmove", handleTouchMove);
-            window.addEventListener("touchend", stopResize);
-            window.addEventListener("touchcancel", stopResize);
         },
         [leftPanelOpen, setLeftPanelOpen, setLeftPanelSize],
     );
@@ -796,12 +760,7 @@ export default function App() {
                                 const nextOpen = pixelSize > LEFT_PANEL_COLLAPSE_TRIGGER_WIDTH;
                                 if (nextOpen !== leftPanelOpen) setLeftPanelOpen(nextOpen);
                                 if (nextOpen) {
-                                    setLeftPanelSize(
-                                        Math.min(
-                                            MAX_LEFT_PANEL_WIDTH,
-                                            Math.max(MIN_LEFT_PANEL_WIDTH, pixelSize),
-                                        ),
-                                    );
+                                    setLeftPanelSize(clampLeftPanelWidth(pixelSize));
                                 }
                             }}
                             className="min-w-0 overflow-hidden"
