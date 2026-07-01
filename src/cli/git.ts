@@ -109,12 +109,13 @@ async function getTrackedDiff(cwd: string, options: DiffOptions): Promise<string
             ...targetArgs,
             "--no-color",
             "--no-ext-diff",
+            "--ignore-cr-at-eol",
             "--src-prefix=a/",
             "--dst-prefix=b/",
         ],
         cwd,
     );
-    return r.stdout;
+    return normalizeLineEndings(r.stdout);
 }
 
 async function getFileAtRef(cwd: string, ref: string, relPath: string): Promise<string | null> {
@@ -137,6 +138,10 @@ async function readWorkingTreeFile(cwd: string, relPath: string): Promise<string
     } catch {
         return null;
     }
+}
+
+function normalizeLineEndings(contents: string): string {
+    return contents.replace(/\r\n/g, "\n");
 }
 
 interface FileSides {
@@ -170,7 +175,11 @@ async function loadFileSides(
         Buffer.byteLength(newContents, "utf8"),
     );
     if (sizeBytes > MAX_CONTENT_BYTES) return "too-large";
-    return { oldContents, newContents, sizeBytes };
+    return {
+        oldContents: normalizeLineEndings(oldContents),
+        newContents: normalizeLineEndings(newContents),
+        sizeBytes,
+    };
 }
 
 async function getUntrackedFiles(cwd: string): Promise<string[]> {
@@ -211,9 +220,11 @@ async function synthesizeUntrackedPatch(cwd: string, relPath: string): Promise<s
     );
     if (!r.stdout) return "";
 
-    return r.stdout.replace(
-        new RegExp(`^diff --git a/${escapeRegex(NULL_DEVICE)} b/${escapeRegex(relPath)}`, "m"),
-        `diff --git a/${relPath} b/${relPath}`,
+    return normalizeLineEndings(
+        r.stdout.replace(
+            new RegExp(`^diff --git a/${escapeRegex(NULL_DEVICE)} b/${escapeRegex(relPath)}`, "m"),
+            `diff --git a/${relPath} b/${relPath}`,
+        ),
     );
 }
 
