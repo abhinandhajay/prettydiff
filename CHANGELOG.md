@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-07-01
+
+### Fixed
+
+- Working trees checked out with CRLF line endings no longer show every line as changed; line endings are normalized so only real edits appear in the diff ([#9](https://github.com/abhinandhajay/prettydiff/pull/9)).
+
 ## [0.5.0] - 2026-06-30
 
 ### Added
@@ -63,6 +69,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 - Detects modified, added, deleted, renamed, and untracked files.
 - Flags: `--port <n>`, `--no-open`, `--version` / `-v`, `--help` / `-h`.
 
+[0.5.1]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.5.1
 [0.5.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.5.0
 [0.4.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.4.0
 [0.3.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.3.0
