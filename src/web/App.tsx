@@ -7,6 +7,7 @@ import {
     ReviewSidebar,
     type ReviewSidebarTab,
 } from "@/components/ReviewSidebar";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import {
     allCommentIds,
     buildFileIndex,
@@ -18,12 +19,14 @@ import { fetchDiff } from "@/lib/fetchDiff";
 import { fileCardId } from "@/lib/slug";
 import { sortFilesForTree } from "@/lib/treeSort";
 import { usePersistedState } from "@/lib/usePersistedState";
+import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
 import type { CommentMap, DiffComment, DiffPayload, DraftLine, ParsedFile } from "@/lib/types";
+import type { PanelImperativeHandle } from "react-resizable-panels";
 
 const EMPTY_COMMENTS: DiffComment[] = [];
 const EMPTY_PATCH_INDEX: PatchLineIndex = {
@@ -37,6 +40,18 @@ const EMPTY_PATCH_INDEX: PatchLineIndex = {
 const HUGE_DIFF_LINE_THRESHOLD = 5000;
 const ESTIMATED_DIFF_HEADER_HEIGHT = 56;
 const ESTIMATED_DIFF_LINE_HEIGHT = 18;
+const COLLAPSED_LEFT_PANEL_WIDTH = 52;
+const LEFT_PANEL_COLLAPSE_TRIGGER_WIDTH = 104;
+const DEFAULT_LEFT_PANEL_WIDTH = 340;
+const MIN_LEFT_PANEL_WIDTH = 260;
+const MAX_LEFT_PANEL_WIDTH = 480;
+
+type LeftPanelDragStartEvent = {
+    clientX?: number;
+    touches?: { 0?: { clientX?: number }; length: number };
+    target?: EventTarget | null;
+    preventDefault?: () => void;
+};
 
 interface DiffFileRenderMeta {
     estimatedHeight: number;
@@ -58,6 +73,16 @@ function yieldForPaint(): Promise<void> {
     return new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
+}
+
+function clampLeftPanelWidth(width: number): number {
+    return Math.min(MAX_LEFT_PANEL_WIDTH, Math.max(MIN_LEFT_PANEL_WIDTH, Math.round(width)));
+}
+
+function getDragClientX(event: LeftPanelDragStartEvent): number | null {
+    if (typeof event.clientX === "number") return event.clientX;
+    const touch = event.touches?.[0];
+    return typeof touch?.clientX === "number" ? touch.clientX : null;
 }
 
 function buildRenderMeta(files: ParsedFile[]): DiffRenderMeta {
@@ -106,6 +131,14 @@ export default function App() {
         "prettydiff:left-panel-tab",
         "changes",
     );
+    const [leftPanelSize, setLeftPanelSize] = usePersistedState<number>(
+        "prettydiff:left-panel-size",
+        DEFAULT_LEFT_PANEL_WIDTH,
+    );
+    const effectiveLeftPanelSize =
+        leftPanelSize < MIN_LEFT_PANEL_WIDTH || leftPanelSize > MAX_LEFT_PANEL_WIDTH
+            ? DEFAULT_LEFT_PANEL_WIDTH
+            : leftPanelSize;
     const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set());
     const [activeDraft, setActiveDraft] = useState<DraftLine | null>(null);
     const [fileRenderMeta, setFileRenderMeta] = useState<DiffRenderMeta>(EMPTY_RENDER_META);
@@ -115,14 +148,119 @@ export default function App() {
         null,
     );
     const [mountReady, setMountReady] = useState(false);
+    const [animatePanel, setAnimatePanel] = useState(false);
 
     const mainRef = useRef<HTMLElement>(null);
     const loadIdRef = useRef(0);
+    const leftPanelRef = useRef<PanelImperativeHandle | null>(null);
+    const closedPanelDragActiveRef = useRef(false);
+    const animateTimerRef = useRef<number | null>(null);
+    const animatingRef = useRef(false);
+    // Frozen at mount: if defaultSize/minSize tracked leftPanelOpen, flipping that
+    // flag mid-drag would re-register the panel and freeze the gesture. Reopen width
+    // is restored imperatively via resize() in setReviewPanelOpen instead.
+    const panelDefaultSizeRef = useRef(
+        leftPanelOpen ? `${effectiveLeftPanelSize}px` : `${COLLAPSED_LEFT_PANEL_WIDTH}px`,
+    );
 
     const commentsRef = useRef(comments);
     useEffect(() => {
         commentsRef.current = comments;
     }, [comments]);
+
+    useEffect(() => {
+        if (leftPanelSize < MIN_LEFT_PANEL_WIDTH || leftPanelSize > MAX_LEFT_PANEL_WIDTH) {
+            setLeftPanelSize(DEFAULT_LEFT_PANEL_WIDTH);
+        }
+    }, [leftPanelSize, setLeftPanelSize]);
+
+    const setReviewPanelOpen = useCallback(
+        (open: boolean) => {
+            setLeftPanelOpen(open);
+            // Animate the panel width only for this programmatic open/collapse; an
+            // always-on flex-grow transition makes interactive drags lag the cursor.
+            // animatingRef silences onResize during the animation so the width
+            // sweeping through the collapse threshold doesn't auto-collapse a reopen.
+            setAnimatePanel(true);
+            animatingRef.current = true;
+            if (animateTimerRef.current !== null) window.clearTimeout(animateTimerRef.current);
+            animateTimerRef.current = window.setTimeout(() => {
+                setAnimatePanel(false);
+                animatingRef.current = false;
+            }, 340);
+            window.requestAnimationFrame(() => {
+                if (open) {
+                    leftPanelRef.current?.resize(`${effectiveLeftPanelSize}px`);
+                } else {
+                    leftPanelRef.current?.collapse();
+                }
+            });
+        },
+        [effectiveLeftPanelSize, setLeftPanelOpen],
+    );
+
+    useEffect(
+        () => () => {
+            if (animateTimerRef.current !== null) window.clearTimeout(animateTimerRef.current);
+        },
+        [],
+    );
+
+    const startClosedPanelResize = useCallback(
+        (event: LeftPanelDragStartEvent) => {
+            if (leftPanelOpen) return;
+            closedPanelDragActiveRef.current = true;
+
+            const applySize = (clientX: number) => {
+                const nextSize = clampLeftPanelWidth(clientX);
+                setLeftPanelSize(nextSize);
+                leftPanelRef.current?.resize(`${nextSize}px`);
+            };
+            const startX = getDragClientX(event);
+            const startSize = startX === null ? MIN_LEFT_PANEL_WIDTH : clampLeftPanelWidth(startX);
+
+            event.preventDefault?.();
+            flushSync(() => {
+                setLeftPanelSize(startSize);
+                setLeftPanelOpen(true);
+            });
+            window.requestAnimationFrame(() => {
+                leftPanelRef.current?.resize(`${startSize}px`);
+            });
+
+            const handlePointerMove = (moveEvent: PointerEvent) => {
+                applySize(moveEvent.clientX);
+            };
+            const handleMouseMove = (moveEvent: MouseEvent) => {
+                applySize(moveEvent.clientX);
+            };
+            const handleTouchMove = (moveEvent: TouchEvent) => {
+                const touch = moveEvent.touches[0];
+                if (touch) applySize(touch.clientX);
+            };
+            const stopResize = () => {
+                closedPanelDragActiveRef.current = false;
+                window.removeEventListener("pointermove", handlePointerMove);
+                window.removeEventListener("pointerup", stopResize);
+                window.removeEventListener("pointercancel", stopResize);
+                window.removeEventListener("mousemove", handleMouseMove);
+                window.removeEventListener("mouseup", stopResize);
+                window.removeEventListener("touchmove", handleTouchMove);
+                window.removeEventListener("touchend", stopResize);
+                window.removeEventListener("touchcancel", stopResize);
+            };
+
+            window.addEventListener("pointermove", handlePointerMove);
+            window.addEventListener("pointerup", stopResize);
+            window.addEventListener("pointercancel", stopResize);
+            window.addEventListener("mousemove", handleMouseMove);
+            window.addEventListener("mouseup", stopResize);
+            window.addEventListener("touchmove", handleTouchMove);
+            window.addEventListener("touchend", stopResize);
+            window.addEventListener("touchcancel", stopResize);
+        },
+        [leftPanelOpen, setLeftPanelOpen, setLeftPanelSize],
+    );
 
     useEffect(() => {
         if (target === "branch" && !targetRef) setTarget("working-tree");
@@ -361,10 +499,10 @@ export default function App() {
                 return next;
             });
             setActiveDraft(null);
-            setLeftPanelOpen(true);
+            setReviewPanelOpen(true);
             setLeftPanelTab("comments");
         },
-        [activeDraft, setComments, setLeftPanelOpen, setLeftPanelTab],
+        [activeDraft, setComments, setLeftPanelTab, setReviewPanelOpen],
     );
 
     const editComment = useCallback(
@@ -433,11 +571,11 @@ export default function App() {
 
     const focusComment = useCallback(
         (id: string) => {
-            setLeftPanelOpen(true);
+            setReviewPanelOpen(true);
             setLeftPanelTab("comments");
             setScrollToCommentId(id);
         },
-        [setLeftPanelOpen, setLeftPanelTab],
+        [setLeftPanelTab, setReviewPanelOpen],
     );
 
     const clearScrollTarget = useCallback(() => setScrollToCommentId(null), []);
@@ -543,6 +681,37 @@ export default function App() {
         );
     }
 
+    const diffContent = (
+        <main ref={mainRef} className="bg-card h-full min-w-0 flex-1 overflow-y-auto">
+            <div>
+                {sortedFiles.map((f) => {
+                    const meta = fileRenderMeta.byPath.get(f.path);
+                    return (
+                        <FileCard
+                            key={f.path}
+                            file={f}
+                            open={openMap[f.path] ?? true}
+                            onOpenChange={setOpen}
+                            viewMode={viewMode}
+                            wrap={wrap}
+                            comments={comments[f.path] ?? EMPTY_COMMENTS}
+                            patchIndex={meta?.patchIndex ?? EMPTY_PATCH_INDEX}
+                            estimatedHeight={meta?.estimatedHeight ?? 0}
+                            activeDraft={activeDraft?.filePath === f.path ? activeDraft : null}
+                            onRequestDraft={requestDraft}
+                            onCancelDraft={cancelDraft}
+                            onSaveDraft={saveDraft}
+                            onFocusComment={focusComment}
+                            onEditComment={editComment}
+                            onDeleteComment={deleteComment}
+                            flashCommentId={diffFlashCommentId}
+                        />
+                    );
+                })}
+            </div>
+        </main>
+    );
+
     const overlayVisible = !payload || !mountReady;
     const overlay = (
         <div
@@ -600,19 +769,48 @@ export default function App() {
                         message="Selected diff has no changes."
                     />
                 ) : (
-                    <div className="relative flex min-h-0 flex-1 overflow-hidden">
-                        <div
-                            className="h-full shrink-0 overflow-hidden"
-                            style={{
-                                width: leftPanelOpen ? "clamp(260px, 28vw, 340px)" : "52px",
-                                transition: "width 280ms cubic-bezier(0.32, 0.72, 0, 1)",
+                    <ResizablePanelGroup
+                        direction="horizontal"
+                        className={cn(
+                            "relative min-h-0 flex-1 overflow-hidden",
+                            animatePanel && "resizable-panel-animated",
+                        )}
+                    >
+                        <ResizablePanel
+                            id="review-sidebar"
+                            panelRef={leftPanelRef}
+                            collapsible
+                            collapsedSize={`${COLLAPSED_LEFT_PANEL_WIDTH}px`}
+                            defaultSize={panelDefaultSizeRef.current}
+                            minSize={`${MIN_LEFT_PANEL_WIDTH}px`}
+                            maxSize={`${MAX_LEFT_PANEL_WIDTH}px`}
+                            groupResizeBehavior="preserve-pixel-size"
+                            onResize={(size) => {
+                                if (animatingRef.current) return;
+                                if (closedPanelDragActiveRef.current) return;
+                                const pixelSize = Math.round(size.inPixels);
+                                // Keep leftPanelOpen in sync with the live width in BOTH
+                                // directions. A single drag can collapse the panel and then
+                                // re-expand it; syncing only on collapse would leave the
+                                // library panel wide while React still renders the 52px rail.
+                                const nextOpen = pixelSize > LEFT_PANEL_COLLAPSE_TRIGGER_WIDTH;
+                                if (nextOpen !== leftPanelOpen) setLeftPanelOpen(nextOpen);
+                                if (nextOpen) {
+                                    setLeftPanelSize(
+                                        Math.min(
+                                            MAX_LEFT_PANEL_WIDTH,
+                                            Math.max(MIN_LEFT_PANEL_WIDTH, pixelSize),
+                                        ),
+                                    );
+                                }
                             }}
+                            className="min-w-0 overflow-hidden"
                         >
                             {leftPanelOpen ? (
                                 <ReviewSidebar
                                     open={leftPanelOpen}
                                     activeTab={leftPanelTab}
-                                    onOpenChange={setLeftPanelOpen}
+                                    onOpenChange={setReviewPanelOpen}
                                     onTabChange={setLeftPanelTab}
                                     files={sortedFiles}
                                     activePath={activePath}
@@ -633,43 +831,20 @@ export default function App() {
                                 <CollapsedReviewRail
                                     files={sortedFiles}
                                     totalCommentCount={totalCommentCount}
-                                    onOpen={() => setLeftPanelOpen(true)}
+                                    onOpen={() => setReviewPanelOpen(true)}
+                                    onResizeStart={startClosedPanelResize}
                                 />
                             )}
-                        </div>
-                        <main ref={mainRef} className="bg-card min-w-0 flex-1 overflow-y-auto">
-                            <div>
-                                {sortedFiles.map((f) => {
-                                    const meta = fileRenderMeta.byPath.get(f.path);
-                                    return (
-                                        <FileCard
-                                            key={f.path}
-                                            file={f}
-                                            open={openMap[f.path] ?? true}
-                                            onOpenChange={setOpen}
-                                            viewMode={viewMode}
-                                            wrap={wrap}
-                                            comments={comments[f.path] ?? EMPTY_COMMENTS}
-                                            patchIndex={meta?.patchIndex ?? EMPTY_PATCH_INDEX}
-                                            estimatedHeight={meta?.estimatedHeight ?? 0}
-                                            activeDraft={
-                                                activeDraft?.filePath === f.path
-                                                    ? activeDraft
-                                                    : null
-                                            }
-                                            onRequestDraft={requestDraft}
-                                            onCancelDraft={cancelDraft}
-                                            onSaveDraft={saveDraft}
-                                            onFocusComment={focusComment}
-                                            onEditComment={editComment}
-                                            onDeleteComment={deleteComment}
-                                            flashCommentId={diffFlashCommentId}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </main>
-                    </div>
+                        </ResizablePanel>
+                        <ResizableHandle
+                            disabled={!leftPanelOpen}
+                            withHandle={leftPanelOpen}
+                            className="transition-colors"
+                        />
+                        <ResizablePanel id="diff-content" defaultSize="100%" minSize="0px">
+                            {diffContent}
+                        </ResizablePanel>
+                    </ResizablePanelGroup>
                 )}
                 {overlay}
             </div>

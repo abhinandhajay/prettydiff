@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Files, MessageSquare, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import type { CommentMap, ParsedFile } from "@/lib/types";
+import type * as React from "react";
 
 export type ReviewSidebarTab = "changes" | "comments";
 
@@ -35,12 +36,19 @@ interface CollapsedReviewRailProps {
     files: ParsedFile[];
     totalCommentCount: number;
     onOpen: () => void;
+    onResizeStart: (
+        event:
+            | React.PointerEvent<HTMLButtonElement>
+            | React.MouseEvent<HTMLButtonElement>
+            | React.TouchEvent<HTMLButtonElement>,
+    ) => void;
 }
 
 export function CollapsedReviewRail({
     files,
     totalCommentCount,
     onOpen,
+    onResizeStart,
 }: CollapsedReviewRailProps) {
     const totals = files.reduce(
         (acc, file) => ({
@@ -51,7 +59,7 @@ export function CollapsedReviewRail({
     );
 
     return (
-        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full w-full flex-col items-center overflow-hidden border-r">
+        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border relative flex h-full w-[52px] flex-col items-center overflow-hidden border-r">
             <div className="border-sidebar-border flex h-12 w-full shrink-0 items-center justify-center border-b">
                 <Button
                     variant="ghost"
@@ -92,6 +100,18 @@ export function CollapsedReviewRail({
                     <span className="text-rose-500 dark:text-rose-400">-{totals.deletions}</span>
                 </div>
             </div>
+            <button
+                type="button"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize sidebar"
+                title="Resize sidebar"
+                onPointerDown={onResizeStart}
+                onMouseDown={onResizeStart}
+                onTouchStart={onResizeStart}
+                onClick={onOpen}
+                className="absolute inset-y-0 right-0 z-20 w-4 cursor-ew-resize appearance-none border-0 bg-transparent p-0"
+            />
         </aside>
     );
 }
@@ -127,6 +147,15 @@ export function ReviewSidebar({
             aria-hidden={!open}
         >
             <div className="border-sidebar-border flex h-12 shrink-0 items-center gap-2 border-b px-2.5">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onOpenChange(false)}
+                    title="Collapse sidebar"
+                    className="text-muted-foreground hover:text-foreground size-8 shrink-0"
+                >
+                    <PanelLeftClose className="size-4" />
+                </Button>
                 <ToggleGroup
                     type="single"
                     value={activeTab}
@@ -163,15 +192,6 @@ export function ReviewSidebar({
                         ) : null}
                     </ToggleGroupItem>
                 </ToggleGroup>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onOpenChange(false)}
-                    title="Collapse sidebar"
-                    className="text-muted-foreground hover:text-foreground size-8 shrink-0"
-                >
-                    <PanelLeftClose className="size-4" />
-                </Button>
             </div>
             {activeTab === "changes" ? (
                 <FileTreePanelContent

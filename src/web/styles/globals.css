@@ -188,3 +188,9 @@
         border: 2px solid transparent;
     }
 }
+
+@layer components {
+    .resizable-panel-animated > [data-panel] {
+        transition: flex-grow 280ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+}
