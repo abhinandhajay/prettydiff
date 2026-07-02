@@ -191,27 +191,42 @@ export function ReviewSidebar({
                     </ToggleGroupItem>
                 </ToggleGroup>
             </div>
-            {activeTab === "changes" ? (
-                <FileTreePanelContent
-                    files={files}
-                    activePath={activePath}
-                    onScrollTo={onScrollToFile}
-                />
-            ) : (
-                <CommentsPanelContent
-                    comments={comments}
-                    totalCount={totalCommentCount}
-                    selectedIds={selectedCommentIds}
-                    onToggleSelected={onToggleSelectedComment}
-                    onToggleFile={onToggleFileComments}
-                    onEdit={onEditComment}
-                    onDelete={onDeleteComment}
-                    onCopy={onCopyComments}
-                    scrollToId={scrollToCommentId}
-                    onScrollHandled={onCommentScrollHandled}
-                    onJumpToDiff={onJumpToDiffComment}
-                />
-            )}
+            <div className="min-h-0 flex-1">
+                <div
+                    className={cn(
+                        "h-full min-h-0 flex-col",
+                        activeTab === "changes" ? "flex" : "hidden",
+                    )}
+                    aria-hidden={activeTab !== "changes"}
+                >
+                    <FileTreePanelContent
+                        files={files}
+                        activePath={activePath}
+                        onScrollTo={onScrollToFile}
+                    />
+                </div>
+                <div
+                    className={cn(
+                        "h-full min-h-0 flex-col",
+                        activeTab === "comments" ? "flex" : "hidden",
+                    )}
+                    aria-hidden={activeTab !== "comments"}
+                >
+                    <CommentsPanelContent
+                        comments={comments}
+                        totalCount={totalCommentCount}
+                        selectedIds={selectedCommentIds}
+                        onToggleSelected={onToggleSelectedComment}
+                        onToggleFile={onToggleFileComments}
+                        onEdit={onEditComment}
+                        onDelete={onDeleteComment}
+                        onCopy={onCopyComments}
+                        scrollToId={scrollToCommentId}
+                        onScrollHandled={onCommentScrollHandled}
+                        onJumpToDiff={onJumpToDiffComment}
+                    />
+                </div>
+            </div>
         </aside>
     );
 }
