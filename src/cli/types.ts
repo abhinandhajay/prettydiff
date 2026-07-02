@@ -8,6 +8,7 @@ export interface BranchRef {
 export interface DiffOptions {
     target: "working-tree" | "branch";
     targetRef?: string;
+    includeWorkingTree?: boolean;
 }
 
 export interface ParsedFile {
@@ -30,6 +31,8 @@ export interface DiffPayload {
     head: string;
     target: DiffOptions["target"];
     targetRef?: string;
+    mergeBase?: string;
+    includeWorkingTree?: boolean;
     generatedAt: string;
     files: ParsedFile[];
 }

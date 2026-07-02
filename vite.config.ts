@@ -22,6 +22,8 @@ interface DevFixturePayload {
     branches?: DevFixtureBranch[];
     target?: "working-tree" | "branch";
     targetRef?: string;
+    mergeBase?: string;
+    includeWorkingTree?: boolean;
     generatedAt?: string;
     files?: DevFixtureFile[];
 }
@@ -40,6 +42,7 @@ function applyDevFixtureOptions(payload: DevFixturePayload, url: URL): DevFixtur
     const branchOptions = branches.some((branch) => branch.name === targetRef)
         ? branches
         : [{ name: targetRef }, ...branches];
+    const includeWorkingTree = url.searchParams.get("includeWorkingTree") !== "0";
     const files = payload.files ?? [];
     const visibleFiles =
         target === "working-tree"
@@ -50,12 +53,14 @@ function applyDevFixtureOptions(payload: DevFixturePayload, url: URL): DevFixtur
         ...payload,
         branches: branchOptions,
         target,
-        ...(target === "branch" ? { targetRef } : {}),
+        ...(target === "branch"
+            ? { targetRef, mergeBase: "f1a7b3e0c9d2e4f6", includeWorkingTree }
+            : {}),
         generatedAt: new Date().toISOString(),
         files:
-            target === "working-tree"
-                ? visibleFiles
-                : visibleFiles.filter((file) => file.status !== "untracked"),
+            target === "branch" && !includeWorkingTree
+                ? visibleFiles.filter((file) => file.status !== "untracked")
+                : visibleFiles,
     };
 }
 

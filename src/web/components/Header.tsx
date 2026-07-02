@@ -11,10 +11,12 @@ import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
 import { repoBasename } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
+    Check,
     ChevronsDownUp,
     ChevronsUpDown,
     GitBranch,
     GitCommitHorizontal,
+    Plus,
     RefreshCw,
     WrapText,
 } from "lucide-react";
@@ -36,6 +38,8 @@ interface Props {
     onTargetChange: (target: "working-tree" | "branch") => void;
     targetRef?: string;
     onTargetRefChange: (targetRef: string) => void;
+    includeWorkingTree: boolean;
+    onIncludeWorkingTreeChange: (includeWorkingTree: boolean) => void;
 }
 
 function LogoMark({ className }: { className?: string }) {
@@ -96,10 +100,16 @@ export function Header({
     onTargetChange,
     targetRef,
     onTargetRefChange,
+    includeWorkingTree,
+    onIncludeWorkingTreeChange,
 }: Props) {
     const branchOptions = payload.branches.filter((branch) => !branch.current);
     const fallbackTargetRef = branchOptions[0]?.name ?? payload.branch;
     const selectedTargetRef = targetRef ?? payload.targetRef ?? fallbackTargetRef;
+    const directionTitle =
+        target === "branch"
+            ? `Changes ${payload.branch}${includeWorkingTree ? " and the working tree" : ""} would merge into ${selectedTargetRef}`
+            : `Uncommitted changes in the working tree, relative to ${payload.branch}`;
 
     const changeTarget = (nextTarget: "working-tree" | "branch") => {
         onTargetChange(nextTarget);
@@ -125,14 +135,6 @@ export function Header({
                     >
                         {repoBasename(payload.repoRoot)}
                     </span>
-                    <span
-                        className="text-foreground/80 bg-muted/60 inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-md px-2 font-mono text-[11.5px]"
-                        title={`Current branch: ${payload.branch}`}
-                    >
-                        <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
-                        <span className="truncate">{payload.branch}</span>
-                    </span>
-                    <span className="text-muted-foreground text-[11.5px]">vs</span>
                     <ToggleGroup
                         type="single"
                         value={target}
@@ -143,42 +145,89 @@ export function Header({
                     >
                         <ToggleGroupItem
                             value="working-tree"
-                            aria-label="Compare to working tree"
+                            aria-label="Show uncommitted working tree changes"
                             className="text-muted-foreground hover:bg-card/60 hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground h-7 rounded-[5px] border-0 bg-transparent px-2.5 text-[11.5px] font-medium tracking-tight transition-colors data-[state=on]:shadow-sm"
                         >
                             Working tree
                         </ToggleGroupItem>
                         <ToggleGroupItem
                             value="branch"
-                            aria-label="Compare to branch"
+                            aria-label="Show changes relative to a base branch"
                             className="text-muted-foreground hover:bg-card/60 hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground h-7 rounded-[5px] border-0 bg-transparent px-2.5 text-[11.5px] font-medium tracking-tight transition-colors data-[state=on]:shadow-sm"
                         >
                             Branch
                         </ToggleGroupItem>
                     </ToggleGroup>
+                    <Divider />
+                    <span
+                        className="text-foreground/80 bg-muted/60 inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-md px-2 font-mono text-[11.5px]"
+                        title={`Current branch: ${payload.branch}`}
+                    >
+                        <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
+                        <span className="truncate">{payload.branch}</span>
+                    </span>
                     {target === "branch" ? (
-                        <Select value={selectedTargetRef} onValueChange={onTargetRefChange}>
-                            <SelectTrigger
-                                aria-label="Target branch"
-                                title={`Target branch: ${selectedTargetRef}`}
-                                className="bg-muted/60 text-foreground/80 h-7 w-auto max-w-[220px] justify-start gap-1.5 border-0 px-2 font-mono text-[11.5px] shadow-none [&>span]:max-w-[160px]"
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onIncludeWorkingTreeChange(!includeWorkingTree)}
+                                aria-pressed={includeWorkingTree}
+                                title={
+                                    includeWorkingTree
+                                        ? "Working tree changes included in the diff — click to show committed changes only"
+                                        : "Committed changes only — click to include working tree changes"
+                                }
+                                className={cn(
+                                    "h-7 gap-1 rounded-md px-2 font-mono text-[11.5px] font-normal",
+                                    includeWorkingTree
+                                        ? "text-foreground/80 bg-muted/60 hover:bg-muted"
+                                        : "text-muted-foreground border-border border border-dashed bg-transparent",
+                                )}
                             >
-                                <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent align="start">
-                                {branchOptions.map((branch) => (
-                                    <SelectItem
-                                        key={branch.name}
-                                        value={branch.name}
-                                        className="font-mono text-[11.5px]"
-                                    >
-                                        {branch.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    ) : null}
+                                {includeWorkingTree ? (
+                                    <Check className="size-3.5 shrink-0" />
+                                ) : (
+                                    <Plus className="size-3.5 shrink-0" />
+                                )}
+                                working tree
+                            </Button>
+                            <span
+                                className="text-muted-foreground shrink-0 text-[11.5px]"
+                                title={directionTitle}
+                            >
+                                into
+                            </span>
+                            <Select value={selectedTargetRef} onValueChange={onTargetRefChange}>
+                                <SelectTrigger
+                                    aria-label="Base branch"
+                                    title={`Base branch: ${selectedTargetRef}${payload.mergeBase ? ` (merge base ${payload.mergeBase.slice(0, 7)})` : ""}`}
+                                    className="bg-muted/60 text-foreground/80 h-7 w-auto max-w-[220px] justify-start gap-1.5 border-0 px-2 font-mono text-[11.5px] shadow-none [&>span]:max-w-[160px]"
+                                >
+                                    <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent align="start">
+                                    {branchOptions.map((branch) => (
+                                        <SelectItem
+                                            key={branch.name}
+                                            value={branch.name}
+                                            className="font-mono text-[11.5px]"
+                                        >
+                                            {branch.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </>
+                    ) : (
+                        <span
+                            className="text-muted-foreground truncate text-[11.5px]"
+                            title={directionTitle}
+                        >
+                            with uncommitted changes
+                        </span>
+                    )}
                     {payload.head ? (
                         <span
                             className="text-muted-foreground inline-flex items-center gap-1 font-mono text-[11.5px]"

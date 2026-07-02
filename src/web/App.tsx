@@ -107,6 +107,10 @@ export default function App() {
         "prettydiff:targetRef",
         null,
     );
+    const [includeWorkingTree, setIncludeWorkingTree] = usePersistedState<boolean>(
+        "prettydiff:includeWorkingTree",
+        true,
+    );
     const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
     const [activePath, setActivePath] = useState<string | null>(null);
 
@@ -240,7 +244,7 @@ export default function App() {
                 setMountReady(false);
                 setLargeDiffHint(null);
             }
-            fetchDiff({ target: requestTarget, targetRef })
+            fetchDiff({ target: requestTarget, targetRef, includeWorkingTree })
                 .then(async (p) => {
                     if (loadId !== loadIdRef.current) return;
                     const renderMeta = buildRenderMeta(p.files);
@@ -313,7 +317,7 @@ export default function App() {
                     if (mode === "reload") setIsReloading(false);
                 });
         },
-        [setComments, target, targetRef],
+        [setComments, target, targetRef, includeWorkingTree],
     );
 
     useEffect(() => {
@@ -724,6 +728,8 @@ export default function App() {
                 onTargetChange={setTarget}
                 targetRef={targetRef ?? payload.targetRef}
                 onTargetRefChange={setTargetRef}
+                includeWorkingTree={includeWorkingTree}
+                onIncludeWorkingTreeChange={setIncludeWorkingTree}
             />
             <div className="relative flex min-h-0 flex-1 overflow-hidden">
                 {payload.files.length === 0 ? (

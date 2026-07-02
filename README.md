@@ -3,15 +3,15 @@
 [![npm version](https://img.shields.io/npm/v/@abhinandhajay/prettydiff)](https://www.npmjs.com/package/@abhinandhajay/prettydiff)
 [![license](https://img.shields.io/github/license/abhinandhajay/prettydiff)](LICENSE)
 
-A refined local web viewer for your Git changes. Run `prettydiff` inside any Git repository and a browser tab opens with a side-by-side or unified diff of your working tree by default, with controls for comparing against another branch when you need a broader review.
+A refined local web viewer for your Git changes. Run `prettydiff` inside any Git repository and a browser tab opens with a side-by-side or unified diff of your working tree by default, with controls for previewing what your branch would merge into another branch when you need a broader review.
 
-![prettydiff screenshot](https://zlbhhflgmo.ufs.sh/f/1Dz4wc6RUalTkFP7DNWKfmH0Ec27OrBGV6X5xptdWIe1jYTo)
+![prettydiff screenshot](https://zlbhhflgmo.ufs.sh/f/1Dz4wc6RUalTCMEOPGXZNoAMPEtuYClQWdvSfbe4hRGFJDs9)
 
 ## Features
 
 - Side-by-side and unified diff views
-- Working-tree diff by default, with branch comparison controls in the header
-- Branch list and target-branch selection for comparing against local or remote refs
+- Working-tree diff by default, with branch-mode controls in the header
+- Branch mode shows everything your current branch would introduce to a selected base branch (local or remote), like a PR diff, with a toggle for including uncommitted and untracked changes
 - File-tree sidebar with status indicators and addition/deletion counts
 - Inline comments on diff lines with edit/delete controls
 - Comments sidebar with jump-to-line navigation and AI-ready copy
@@ -41,7 +41,7 @@ From inside any Git repo with uncommitted changes:
 prettydiff
 ```
 
-The viewer opens in working-tree mode. Use the header controls to switch to branch comparison and choose the target branch; branch comparisons are selected in the web UI, not with a CLI flag.
+The viewer opens in working-tree mode. Use the header controls to switch to branch mode and choose the base branch — the diff then shows what merging your current branch into that base would introduce. The "+ working tree" toggle controls whether uncommitted and untracked changes are included on top of the committed ones. Branch mode is selected in the web UI, not with a CLI flag.
 
 Options:
 
