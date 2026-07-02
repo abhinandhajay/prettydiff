@@ -11,7 +11,7 @@ interface Props {
     onScrollTo: (path: string) => void;
 }
 
-export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
+export function FileTreePanelContent({ files, activePath, onScrollTo }: Props) {
     const { paths, gitStatus, counts, totalAdd, totalDel } = useMemo(() => {
         const paths: string[] = [];
         const gitStatus: { path: string; status: ParsedFile["status"] }[] = [];
@@ -159,11 +159,11 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
     );
 
     return (
-        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full min-h-0 flex-col overflow-hidden border-r">
+        <>
             <div className="border-sidebar-border flex h-10 shrink-0 items-center justify-between border-b px-3">
                 <div className="flex items-center gap-2">
                     <span className="text-muted-foreground text-[10px] font-medium tracking-[0.13em] uppercase">
-                        Changes
+                        Files
                     </span>
                     <span className="text-foreground/80 font-mono text-[10.5px] tabular-nums">
                         {files.length}
@@ -264,6 +264,6 @@ export function FileTreeSidebar({ files, activePath, onScrollTo }: Props) {
                     <div className="h-full bg-rose-400/80" style={{ width: `${delPct}%` }} />
                 </div>
             </div>
-        </aside>
+        </>
     );
 }

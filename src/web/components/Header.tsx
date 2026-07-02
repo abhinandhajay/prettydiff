@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
     Select,
@@ -16,7 +15,6 @@ import {
     ChevronsUpDown,
     GitBranch,
     GitCommitHorizontal,
-    MessageSquare,
     RefreshCw,
     WrapText,
 } from "lucide-react";
@@ -38,9 +36,6 @@ interface Props {
     onTargetChange: (target: "working-tree" | "branch") => void;
     targetRef?: string;
     onTargetRefChange: (targetRef: string) => void;
-    showComments: boolean;
-    onShowCommentsChange: (v: boolean) => void;
-    commentCount: number;
 }
 
 function LogoMark({ className }: { className?: string }) {
@@ -101,9 +96,6 @@ export function Header({
     onTargetChange,
     targetRef,
     onTargetRefChange,
-    showComments,
-    onShowCommentsChange,
-    commentCount,
 }: Props) {
     const branchOptions = payload.branches.filter((branch) => !branch.current);
     const fallbackTargetRef = branchOptions[0]?.name ?? payload.branch;
@@ -235,29 +227,6 @@ export function Header({
                 </div>
                 <Divider />
                 <ViewToggle value={viewMode} onChange={onViewModeChange} />
-                <Divider />
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onShowCommentsChange(!showComments)}
-                    aria-pressed={showComments}
-                    title={showComments ? "Hide comments sidebar" : "Show comments sidebar"}
-                    className={cn(
-                        "relative text-muted-foreground hover:text-foreground",
-                        showComments && "text-foreground bg-muted",
-                    )}
-                >
-                    <MessageSquare />
-                    <span className="hidden lg:inline">Comments</span>
-                    {commentCount > 0 ? (
-                        <Badge
-                            variant="secondary"
-                            className="pointer-events-none absolute -top-1 -right-1 h-4 min-w-4 rounded-full px-1 font-mono text-[9px] tabular-nums"
-                        >
-                            {commentCount}
-                        </Badge>
-                    ) : null}
-                </Button>
             </div>
         </header>
     );
