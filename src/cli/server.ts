@@ -23,7 +23,8 @@ export async function startServer(repoRoot: string, port: number): Promise<Start
     app.get("/api/diff", async (c) => {
         const target = c.req.query("target") === "branch" ? "branch" : "working-tree";
         const targetRef = c.req.query("targetRef") || undefined;
-        const payload = await getDiffPayload(repoRoot, { target, targetRef });
+        const includeWorkingTree = c.req.query("includeWorkingTree") !== "0";
+        const payload = await getDiffPayload(repoRoot, { target, targetRef, includeWorkingTree });
         if (!payload) return c.json({ error: "not a git repository" }, 500);
         return c.json(payload);
     });
