@@ -242,6 +242,18 @@ function splitCombinedPatch(combined: string): string[] {
     return parts.filter((p) => p.trim().length > 0);
 }
 
+function getPatchPaths(patch: string): Set<string> {
+    const paths = new Set<string>();
+    for (const block of splitCombinedPatch(patch)) {
+        for (const parsed of parseDiffLib(block)) {
+            const { path: filePath, oldPath } = normalizePath(parsed);
+            paths.add(filePath);
+            if (oldPath) paths.add(oldPath);
+        }
+    }
+    return paths;
+}
+
 function inferStatus(parsed: parseDiffLib.File, isUntracked: boolean): FileStatus {
     if (isUntracked) return "untracked";
     if (parsed.new) return "added";
@@ -317,11 +329,14 @@ export async function getDiffPayload(
         getBranches(repoRoot, branch),
     ]);
 
+    const trackedPaths = getPatchPaths(trackedPatch);
     const synthesized = await Promise.all(
-        untrackedList.map(async (rel) => ({
-            rel,
-            patch: await synthesizeUntrackedPatch(repoRoot, rel),
-        })),
+        untrackedList
+            .filter((rel) => !trackedPaths.has(rel))
+            .map(async (rel) => ({
+                rel,
+                patch: await synthesizeUntrackedPatch(repoRoot, rel),
+            })),
     );
     const untrackedPaths = new Set<string>();
     const untrackedPatches: string[] = [];
