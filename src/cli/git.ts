@@ -99,14 +99,17 @@ async function getHead(cwd: string): Promise<string> {
     }
 }
 
-async function getTrackedDiff(cwd: string, options: DiffOptions): Promise<string> {
-    const targetArgs = options.target === "working-tree" ? [] : [options.targetRef ?? "HEAD"];
+async function getTrackedDiff(
+    cwd: string,
+    baseRef: string,
+    newRef: string | null,
+): Promise<string> {
     const r = await run(
         "git",
         [
             "diff",
-            "HEAD",
-            ...targetArgs,
+            baseRef,
+            ...(newRef ? [newRef] : []),
             "--no-color",
             "--no-ext-diff",
             "--ignore-cr-at-eol",
@@ -153,18 +156,19 @@ interface FileSides {
 async function loadFileSides(
     cwd: string,
     file: ParsedFile,
-    options: DiffOptions,
+    baseRef: string,
+    newRef: string | null,
 ): Promise<FileSides | "too-large"> {
     const oldRef = file.oldPath ?? file.path;
     const needsOld = file.status !== "added" && file.status !== "untracked";
     const needsNew = file.status !== "deleted";
 
     const [oldRaw, newRaw] = await Promise.all([
-        needsOld ? getFileAtRef(cwd, "HEAD", oldRef) : Promise.resolve(""),
+        needsOld ? getFileAtRef(cwd, baseRef, oldRef) : Promise.resolve(""),
         needsNew
-            ? options.target === "working-tree"
-                ? readWorkingTreeFile(cwd, file.path)
-                : getFileAtRef(cwd, options.targetRef ?? "HEAD", file.path)
+            ? newRef
+                ? getFileAtRef(cwd, newRef, file.path)
+                : readWorkingTreeFile(cwd, file.path)
             : Promise.resolve(""),
     ]);
 
@@ -238,6 +242,18 @@ function splitCombinedPatch(combined: string): string[] {
     return parts.filter((p) => p.trim().length > 0);
 }
 
+function getPatchPaths(patch: string): Set<string> {
+    const paths = new Set<string>();
+    for (const block of splitCombinedPatch(patch)) {
+        for (const parsed of parseDiffLib(block)) {
+            const { path: filePath, oldPath } = normalizePath(parsed);
+            paths.add(filePath);
+            if (oldPath) paths.add(oldPath);
+        }
+    }
+    return paths;
+}
+
 function inferStatus(parsed: parseDiffLib.File, isUntracked: boolean): FileStatus {
     if (isUntracked) return "untracked";
     if (parsed.new) return "added";
@@ -278,6 +294,17 @@ async function resolveTargetRef(
     }
 }
 
+async function resolveMergeBase(cwd: string, targetRef: string): Promise<string | null> {
+    try {
+        // exit 1 means no common ancestor (unrelated histories).
+        const r = await run("git", ["merge-base", targetRef, "HEAD"], cwd, [0, 1]);
+        const sha = r.stdout.trim();
+        return r.code === 0 && sha ? sha : null;
+    } catch {
+        return null;
+    }
+}
+
 export async function getDiffPayload(
     cwd: string,
     requestedOptions: Partial<DiffOptions> = {},
@@ -291,19 +318,25 @@ export async function getDiffPayload(
         target === "branch"
             ? await resolveTargetRef(repoRoot, requestedOptions.targetRef, branch)
             : undefined;
-    const options: DiffOptions = { target, ...(targetRef ? { targetRef } : {}) };
+    const mergeBase = targetRef ? await resolveMergeBase(repoRoot, targetRef) : null;
+    const baseRef = target === "branch" ? (mergeBase ?? targetRef ?? "HEAD") : "HEAD";
+    const includeWorkingTree = target !== "branch" || (requestedOptions.includeWorkingTree ?? true);
+    const newRef = includeWorkingTree ? null : "HEAD";
 
     const [trackedPatch, untrackedList, branches] = await Promise.all([
-        getTrackedDiff(repoRoot, options),
-        target === "working-tree" ? getUntrackedFiles(repoRoot) : Promise.resolve([]),
+        getTrackedDiff(repoRoot, baseRef, newRef),
+        includeWorkingTree ? getUntrackedFiles(repoRoot) : Promise.resolve([]),
         getBranches(repoRoot, branch),
     ]);
 
+    const trackedPaths = getPatchPaths(trackedPatch);
     const synthesized = await Promise.all(
-        untrackedList.map(async (rel) => ({
-            rel,
-            patch: await synthesizeUntrackedPatch(repoRoot, rel),
-        })),
+        untrackedList
+            .filter((rel) => !trackedPaths.has(rel))
+            .map(async (rel) => ({
+                rel,
+                patch: await synthesizeUntrackedPatch(repoRoot, rel),
+            })),
     );
     const untrackedPaths = new Set<string>();
     const untrackedPatches: string[] = [];
@@ -348,7 +381,7 @@ export async function getDiffPayload(
     await Promise.all(
         files.map(async (file) => {
             if (file.skipped || file.binary) return;
-            const sides = await loadFileSides(repoRoot, file, options);
+            const sides = await loadFileSides(repoRoot, file, baseRef, newRef);
             if (sides === "too-large") {
                 file.rawPatch = "";
                 file.skipped = { reason: "too-large" };
@@ -366,6 +399,8 @@ export async function getDiffPayload(
         head,
         target,
         ...(targetRef ? { targetRef } : {}),
+        ...(mergeBase ? { mergeBase } : {}),
+        ...(target === "branch" ? { includeWorkingTree } : {}),
         generatedAt: new Date().toISOString(),
         files,
     };
