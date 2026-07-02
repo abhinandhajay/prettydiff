@@ -800,7 +800,7 @@ export default function App() {
                             withHandle={leftPanelOpen}
                             className="transition-colors"
                         />
-                        <ResizablePanel id="diff-content" defaultSize="100%" minSize="0px">
+                        <ResizablePanel id="diff-content" minSize="0px">
                             {diffContent}
                         </ResizablePanel>
                     </ResizablePanelGroup>
