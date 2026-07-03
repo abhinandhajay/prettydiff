@@ -39,6 +39,9 @@ const EMPTY_PATCH_INDEX: PatchLineIndex = {
     patchDeletions: new Set(),
 };
 const HUGE_DIFF_LINE_THRESHOLD = 5000;
+const EAGER_DIFF_CARD_COUNT = 8;
+const BACKGROUND_PRELOAD_CARD_BATCH = 2;
+const BACKGROUND_PRELOAD_INTERVAL_MS = 900;
 const ESTIMATED_DIFF_HEADER_HEIGHT = 56;
 const ESTIMATED_DIFF_LINE_HEIGHT = 18;
 const COLLAPSED_LEFT_PANEL_WIDTH = 52;
@@ -140,6 +143,7 @@ export default function App() {
         null,
     );
     const [mountReady, setMountReady] = useState(false);
+    const [stagedDiffCardCount, setStagedDiffCardCount] = useState(EAGER_DIFF_CARD_COUNT);
     const [animatePanel, setAnimatePanel] = useState(false);
 
     const mainRef = useRef<HTMLElement>(null);
@@ -242,6 +246,7 @@ export default function App() {
             if (mode === "initial") {
                 setIsReloading(false);
                 setMountReady(false);
+                setStagedDiffCardCount(EAGER_DIFF_CARD_COUNT);
                 setLargeDiffHint(null);
             }
             fetchDiff({ target: requestTarget, targetRef, includeWorkingTree })
@@ -269,6 +274,7 @@ export default function App() {
                     if (loadId !== loadIdRef.current) return;
                     setPayload(p);
                     setFileRenderMeta(renderMeta);
+                    setStagedDiffCardCount(EAGER_DIFF_CARD_COUNT);
                     if (stamped !== commentsRef.current) {
                         setComments(stamped);
                     }
@@ -356,11 +362,10 @@ export default function App() {
             cancelled = true;
         };
         // Re-measure every frame and drive the card's top to the scroller's top.
-        // The cards use content-visibility, so off-screen intrinsic heights are
-        // only estimates until a card renders — a one-shot scrollIntoView lands
-        // off when those estimates differ from the real diff height. Re-targeting
-        // each frame converges to the exact position regardless. Same velocity-
-        // smoothed easing as the comment jump below.
+        // Lazy diff bodies use estimated heights until they render, so a
+        // one-shot scrollIntoView can land off target. Re-targeting each frame
+        // converges to the exact position regardless. Same velocity-smoothed
+        // easing as the comment jump below.
         let frames = 0;
         let settle = 0;
         let velocity = 0;
@@ -423,6 +428,8 @@ export default function App() {
     }, [payload]);
 
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
+    const shouldStageDiffPreload = shouldShowLargeDiffHint(fileRenderMeta.totalLines);
+    const eagerDiffCardCount = shouldStageDiffPreload ? stagedDiffCardCount : sortedFiles.length;
 
     const allExpanded = useMemo(
         () => (payload ? payload.files.every((f) => openMap[f.path] ?? true) : true),
@@ -610,9 +617,6 @@ export default function App() {
             setMountReady(true);
             return;
         }
-        // Large diff: keep the loading overlay up until the browser is fully
-        // idle — mount commit, initial paint, content-visibility paint of
-        // near-viewport cards, and any post-mount effects have all completed.
         type Win = Window & {
             requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
             cancelIdleCallback?: (id: number) => void;
@@ -629,6 +633,21 @@ export default function App() {
         const id = window.setTimeout(markReady, 300);
         return () => window.clearTimeout(id);
     }, [payload, largeDiffHint]);
+
+    useEffect(() => {
+        if (!payload) {
+            setStagedDiffCardCount(EAGER_DIFF_CARD_COUNT);
+            return;
+        }
+        if (!shouldStageDiffPreload) return;
+        if (stagedDiffCardCount >= sortedFiles.length) return;
+        const id = window.setTimeout(() => {
+            setStagedDiffCardCount((count) =>
+                Math.min(sortedFiles.length, count + BACKGROUND_PRELOAD_CARD_BATCH),
+            );
+        }, BACKGROUND_PRELOAD_INTERVAL_MS);
+        return () => window.clearTimeout(id);
+    }, [payload, shouldStageDiffPreload, stagedDiffCardCount, sortedFiles.length]);
 
     useEffect(() => {
         if (!activeDraft) return;
@@ -652,7 +671,7 @@ export default function App() {
     const diffContent = (
         <main ref={mainRef} className="bg-card h-full min-w-0 flex-1 overflow-y-auto">
             <div>
-                {sortedFiles.map((f) => {
+                {sortedFiles.map((f, index) => {
                     const meta = fileRenderMeta.byPath.get(f.path);
                     return (
                         <FileCard
@@ -664,7 +683,8 @@ export default function App() {
                             wrap={wrap}
                             comments={comments[f.path] ?? EMPTY_COMMENTS}
                             patchIndex={meta?.patchIndex ?? EMPTY_PATCH_INDEX}
-                            estimatedHeight={meta?.estimatedHeight ?? 0}
+                            estimatedHeight={meta?.estimatedHeight ?? ESTIMATED_DIFF_HEADER_HEIGHT}
+                            eager={index < eagerDiffCardCount}
                             activeDraft={activeDraft?.filePath === f.path ? activeDraft : null}
                             onRequestDraft={requestDraft}
                             onCancelDraft={cancelDraft}
@@ -695,7 +715,7 @@ export default function App() {
                 title={largeDiffHint ? "Preparing large diff…" : "Loading…"}
                 message={
                     largeDiffHint
-                        ? `${largeDiffHint.files} files, ~${(largeDiffHint.lines / 1000).toFixed(1)}k lines. This may take a moment.`
+                        ? `${largeDiffHint.files} files, ~${(largeDiffHint.lines / 1000).toFixed(1)}k lines.`
                         : undefined
                 }
             />

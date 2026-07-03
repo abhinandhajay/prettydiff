@@ -1,5 +1,5 @@
 import { CommentComposer } from "@/components/CommentComposer";
-import { CommentIndicator } from "@/components/CommentIndicator";
+import { CommentIndicator, commentIndicatorDomId } from "@/components/CommentIndicator";
 import { DiffErrorBoundary } from "@/components/DiffErrorBoundary";
 import { LazyDiffBody } from "@/components/LazyDiffBody";
 import { SkippedPreview } from "@/components/SkippedPreview";
@@ -20,7 +20,7 @@ import {
     FilePlus,
     Plus,
 } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
@@ -67,6 +67,7 @@ interface Props {
     comments: DiffComment[];
     patchIndex: PatchLineIndex;
     estimatedHeight: number;
+    eager: boolean;
     activeDraft: DraftLine | null;
     onRequestDraft: (draft: DraftLine) => void;
     onCancelDraft: () => void;
@@ -135,6 +136,7 @@ function FileCardImpl({
     comments,
     patchIndex,
     estimatedHeight,
+    eager,
     activeDraft,
     onRequestDraft,
     onCancelDraft,
@@ -145,6 +147,29 @@ function FileCardImpl({
     flashCommentId,
 }: Props) {
     const { dir, base } = splitPath(file.path);
+    const [renderPass, setRenderPass] = useState(0);
+    const renderRafRef = useRef<number | null>(null);
+
+    const refreshDiffRender = useCallback(() => {
+        if (renderRafRef.current !== null) cancelAnimationFrame(renderRafRef.current);
+        renderRafRef.current = requestAnimationFrame(() => {
+            renderRafRef.current = requestAnimationFrame(() => {
+                renderRafRef.current = null;
+                setRenderPass((pass) => pass + 1);
+            });
+        });
+    }, []);
+
+    useEffect(() => {
+        setRenderPass(0);
+    }, [file.path, viewMode, wrap]);
+
+    useEffect(
+        () => () => {
+            if (renderRafRef.current !== null) cancelAnimationFrame(renderRafRef.current);
+        },
+        [],
+    );
 
     const handleOpenChange = useCallback(
         (next: boolean) => onOpenChange(file.path, next),
@@ -176,6 +201,20 @@ function FileCardImpl({
 
         return annotations;
     }, [comments, activeDraft]);
+
+    const commentPlaceholders = useMemo(
+        () =>
+            comments
+                .filter((c) => !c.stale)
+                .map((c) => (
+                    <span
+                        key={c.id}
+                        id={commentIndicatorDomId(c.id)}
+                        className="block h-0 overflow-hidden"
+                    />
+                )),
+        [comments],
+    );
 
     const handleGutterClick = useCallback(
         (getHover: () => { lineNumber: number; side: CommentSide } | undefined) => {
@@ -319,9 +358,15 @@ function FileCardImpl({
                                     key={file.path}
                                     fallback={<SkippedPreview reason="render-error" />}
                                 >
-                                    <LazyDiffBody estimatedHeight={estimatedHeight}>
+                                    <LazyDiffBody
+                                        estimatedHeight={estimatedHeight}
+                                        eager={eager}
+                                        placeholder={commentPlaceholders}
+                                        onRender={refreshDiffRender}
+                                    >
                                         <div className="bg-card overflow-x-auto">
                                             <MultiFileDiff<AnnotationMeta>
+                                                key={renderPass}
                                                 oldFile={oldFile}
                                                 newFile={newFile}
                                                 options={diffOptions}
