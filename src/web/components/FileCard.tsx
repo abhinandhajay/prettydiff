@@ -20,7 +20,7 @@ import {
     FilePlus,
     Plus,
 } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
@@ -67,6 +67,7 @@ interface Props {
     comments: DiffComment[];
     patchIndex: PatchLineIndex;
     estimatedHeight: number;
+    eager: boolean;
     activeDraft: DraftLine | null;
     onRequestDraft: (draft: DraftLine) => void;
     onCancelDraft: () => void;
@@ -135,6 +136,7 @@ function FileCardImpl({
     comments,
     patchIndex,
     estimatedHeight,
+    eager,
     activeDraft,
     onRequestDraft,
     onCancelDraft,
@@ -145,6 +147,29 @@ function FileCardImpl({
     flashCommentId,
 }: Props) {
     const { dir, base } = splitPath(file.path);
+    const [renderPass, setRenderPass] = useState(0);
+    const renderRafRef = useRef<number | null>(null);
+
+    const refreshDiffRender = useCallback(() => {
+        if (renderRafRef.current !== null) cancelAnimationFrame(renderRafRef.current);
+        renderRafRef.current = requestAnimationFrame(() => {
+            renderRafRef.current = requestAnimationFrame(() => {
+                renderRafRef.current = null;
+                setRenderPass((pass) => pass + 1);
+            });
+        });
+    }, []);
+
+    useEffect(() => {
+        setRenderPass(0);
+    }, [file.path, viewMode, wrap]);
+
+    useEffect(
+        () => () => {
+            if (renderRafRef.current !== null) cancelAnimationFrame(renderRafRef.current);
+        },
+        [],
+    );
 
     const handleOpenChange = useCallback(
         (next: boolean) => onOpenChange(file.path, next),
@@ -319,9 +344,14 @@ function FileCardImpl({
                                     key={file.path}
                                     fallback={<SkippedPreview reason="render-error" />}
                                 >
-                                    <LazyDiffBody estimatedHeight={estimatedHeight}>
+                                    <LazyDiffBody
+                                        estimatedHeight={estimatedHeight}
+                                        eager={eager}
+                                        onRender={refreshDiffRender}
+                                    >
                                         <div className="bg-card overflow-x-auto">
                                             <MultiFileDiff<AnnotationMeta>
+                                                key={renderPass}
                                                 oldFile={oldFile}
                                                 newFile={newFile}
                                                 options={diffOptions}
