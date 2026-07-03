@@ -1,5 +1,5 @@
 import { CommentComposer } from "@/components/CommentComposer";
-import { CommentIndicator } from "@/components/CommentIndicator";
+import { CommentIndicator, commentIndicatorDomId } from "@/components/CommentIndicator";
 import { DiffErrorBoundary } from "@/components/DiffErrorBoundary";
 import { LazyDiffBody } from "@/components/LazyDiffBody";
 import { SkippedPreview } from "@/components/SkippedPreview";
@@ -202,6 +202,20 @@ function FileCardImpl({
         return annotations;
     }, [comments, activeDraft]);
 
+    const commentPlaceholders = useMemo(
+        () =>
+            comments
+                .filter((c) => !c.stale)
+                .map((c) => (
+                    <span
+                        key={c.id}
+                        id={commentIndicatorDomId(c.id)}
+                        className="block h-0 overflow-hidden"
+                    />
+                )),
+        [comments],
+    );
+
     const handleGutterClick = useCallback(
         (getHover: () => { lineNumber: number; side: CommentSide } | undefined) => {
             const hover = getHover();
@@ -347,6 +361,7 @@ function FileCardImpl({
                                     <LazyDiffBody
                                         estimatedHeight={estimatedHeight}
                                         eager={eager}
+                                        placeholder={commentPlaceholders}
                                         onRender={refreshDiffRender}
                                     >
                                         <div className="bg-card overflow-x-auto">

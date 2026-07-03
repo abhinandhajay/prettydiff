@@ -3,13 +3,20 @@ import { useEffect, useRef, useState } from "react";
 interface Props {
     estimatedHeight: number;
     eager?: boolean;
+    placeholder?: React.ReactNode;
     children: React.ReactNode;
     onRender: () => void;
 }
 
 const PRELOAD_MARGIN_PX = 6000;
 
-export function LazyDiffBody({ estimatedHeight, eager = false, children, onRender }: Props) {
+export function LazyDiffBody({
+    estimatedHeight,
+    eager = false,
+    placeholder = null,
+    children,
+    onRender,
+}: Props) {
     const ref = useRef<HTMLDivElement | null>(null);
     const [shouldRender, setShouldRender] = useState(eager);
     const [isSettled, setIsSettled] = useState(false);
@@ -57,7 +64,7 @@ export function LazyDiffBody({ estimatedHeight, eager = false, children, onRende
 
     return (
         <div ref={ref} style={{ minHeight: isSettled ? undefined : `${estimatedHeight}px` }}>
-            {shouldRender ? children : null}
+            {shouldRender ? children : placeholder}
         </div>
     );
 }
