@@ -17,7 +17,11 @@ export interface StartedServer {
     close: () => Promise<void>;
 }
 
-export async function startServer(repoRoot: string, port: number): Promise<StartedServer> {
+export async function startServer(
+    repoRoot: string,
+    port: number,
+    webRoot: string = WEB_ROOT,
+): Promise<StartedServer> {
     const app = new Hono();
 
     app.get("/api/diff", async (c) => {
@@ -32,13 +36,13 @@ export async function startServer(repoRoot: string, port: number): Promise<Start
     app.use(
         "/assets/*",
         serveStatic({
-            root: path.relative(process.cwd(), WEB_ROOT) || ".",
+            root: path.relative(process.cwd(), webRoot) || ".",
         }),
     );
 
     app.get("*", async (c) => {
         try {
-            const html = await readFile(path.join(WEB_ROOT, "index.html"), "utf8");
+            const html = await readFile(path.join(webRoot, "index.html"), "utf8");
             return c.html(html);
         } catch {
             return c.text("prettydiff: web bundle missing. Reinstall the package.", 500);

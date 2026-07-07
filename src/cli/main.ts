@@ -25,7 +25,7 @@ interface Args {
     help: boolean;
 }
 
-function parseArgs(argv: string[]): Args {
+export function parseArgs(argv: string[]): Args {
     const a = mri(argv, {
         boolean: ["help", "version", "open"],
         default: { open: true },
