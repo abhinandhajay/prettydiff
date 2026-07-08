@@ -36,3 +36,41 @@ export interface DiffPayload {
     generatedAt: string;
     files: ParsedFile[];
 }
+
+export interface RepoInfo {
+    id: string;
+    repoRoot: string;
+    isHub?: boolean;
+    branch?: string;
+}
+
+export interface HubIdentity {
+    app: "prettydiff";
+    version: string;
+    hubId: string;
+}
+
+export interface HubReposResponse {
+    hubId: string;
+    repos: RepoInfo[];
+}
+
+export interface RegisterRequest {
+    repoRoot: string;
+    clientId: string;
+}
+
+export interface RegisterResponse {
+    hubId: string;
+    repo: RepoInfo;
+}
+
+export interface HeartbeatRequest {
+    repoId: string;
+    clientId: string;
+}
+
+export interface UnregisterRequest {
+    repoId: string;
+    clientId: string;
+}

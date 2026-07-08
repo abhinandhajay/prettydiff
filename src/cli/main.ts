@@ -1,8 +1,10 @@
 import mri from "mri";
 import open from "open";
 
-import { getRepoRoot } from "./git.js";
+import { canonicalRepoRoot } from "./git.js";
+import { startInstance } from "./hubClient.js";
 import { findPort } from "./port.js";
+import { HubRegistry } from "./registry.js";
 import { startServer } from "./server.js";
 import { checkForUpdate, detectInstaller, formatUpdateNotice } from "./update.js";
 
@@ -14,6 +16,7 @@ Usage:
 Options:
   --port <n>     Preferred port (default: auto in 39400-39499)
   --no-open      Do not open the browser automatically
+  --standalone   Start a separate server instead of attaching to a running one
   --version      Print version and exit
   --help         Print this help and exit
 `;
@@ -21,19 +24,21 @@ Options:
 interface Args {
     port?: number;
     open: boolean;
+    standalone: boolean;
     version: boolean;
     help: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
     const a = mri(argv, {
-        boolean: ["help", "version", "open"],
+        boolean: ["help", "version", "open", "standalone"],
         default: { open: true },
         alias: { h: "help", v: "version" },
     });
     return {
         port: a.port ? Number(a.port) : undefined,
         open: a.open !== false,
+        standalone: !!a.standalone,
         version: !!a.version,
         help: !!a.help,
     };
@@ -61,19 +66,38 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
     }
 
-    const repoRoot = await getRepoRoot(process.cwd());
+    const repoRoot = await canonicalRepoRoot(process.cwd());
     if (!repoRoot) {
         process.stderr.write("prettydiff: not a git repository\n");
         return 1;
     }
 
-    const port = await findPort(args.port);
-    const server = await startServer(repoRoot, port);
+    const clientId = crypto.randomUUID();
+    const instance = await startInstance({
+        repoRoot,
+        clientId,
+        version,
+        preferredPort: args.port,
+        standalone: args.standalone,
+        startHubServer: (port) => {
+            const registry = new HubRegistry();
+            registry.register(repoRoot, clientId, { isHub: true });
+            return startServer({ port, version, hubId: crypto.randomUUID(), registry });
+        },
+        findFreePort: findPort,
+        log: (message) => process.stdout.write(message + "\n"),
+    });
 
-    process.stdout.write(`prettydiff: serving on ${server.url}  (ctrl-c to quit)\n`);
+    if (instance.mode === "hub") {
+        process.stdout.write(`prettydiff: serving on ${instance.url}  (ctrl-c to quit)\n`);
+    } else {
+        process.stdout.write(
+            `prettydiff: attached to running server — ${instance.url}  (ctrl-c to detach)\n`,
+        );
+    }
 
     if (args.open) {
-        open(server.url).catch(() => {
+        open(instance.url).catch(() => {
             // ignore — the URL is printed above
         });
     }
@@ -92,7 +116,7 @@ export async function main(argv: string[]): Promise<number> {
         const shutdown = async () => {
             if (shuttingDown) return;
             shuttingDown = true;
-            await server.close();
+            await instance.stop();
             resolve();
         };
         process.on("SIGINT", shutdown);

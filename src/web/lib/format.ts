@@ -2,6 +2,52 @@ export function repoBasename(repoRoot: string): string {
     return repoRoot.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
 }
 
+export function displayPath(path: string): string {
+    return path.replace(/\\/g, "/").replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, "~");
+}
+
+// Labels for a set of repo roots: the basename, plus — for colliding basenames
+// (clones/worktrees of the same project) — as many trailing parent segments as
+// needed to tell them apart, VS Code style: "repo — a" vs "repo — b".
+export function repoDisplayLabels(repoRoots: string[]): Map<string, string> {
+    const segmentsFor = (root: string) => root.replace(/\\/g, "/").split("/").filter(Boolean);
+    const labels = new Map<string, string>();
+    const groups = new Map<string, string[]>();
+    for (const root of repoRoots) {
+        const base = repoBasename(root);
+        const group = groups.get(base);
+        if (group) group.push(root);
+        else groups.set(base, [root]);
+    }
+    for (const [base, roots] of groups) {
+        if (roots.length === 1) {
+            labels.set(roots[0], base);
+            continue;
+        }
+        const maxDepth = Math.max(...roots.map((root) => segmentsFor(root).length - 1));
+        for (let depth = 1; depth <= Math.max(1, maxDepth); depth++) {
+            const candidates = new Map<string, string>();
+            const counts = new Map<string, number>();
+            for (const root of roots) {
+                const segments = segmentsFor(root);
+                const parents = segments.slice(
+                    Math.max(0, segments.length - 1 - depth),
+                    segments.length - 1,
+                );
+                const label = parents.length > 0 ? `${base} — ${parents.join("/")}` : base;
+                candidates.set(root, label);
+                counts.set(label, (counts.get(label) ?? 0) + 1);
+            }
+            const allDistinct = [...counts.values()].every((count) => count === 1);
+            if (allDistinct || depth >= maxDepth) {
+                for (const [root, label] of candidates) labels.set(root, label);
+                break;
+            }
+        }
+    }
+    return labels;
+}
+
 export function formatRelativeTime(timestamp: number, now: number = Date.now()): string {
     const diff = Math.max(0, now - timestamp);
     const sec = Math.floor(diff / 1000);

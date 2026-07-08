@@ -1,4 +1,11 @@
-export type { DiffPayload, ParsedFile, FileStatus } from "../../cli/types";
+export type {
+    DiffPayload,
+    ParsedFile,
+    FileStatus,
+    RepoInfo,
+    HubIdentity,
+    HubReposResponse,
+} from "../../cli/types";
 
 export type CommentSide = "additions" | "deletions";
 
