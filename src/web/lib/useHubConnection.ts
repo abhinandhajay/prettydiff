@@ -10,7 +10,10 @@ const RECONNECTED_BADGE_MS = 3000;
 
 // Polls the hub identity endpoint so the viewer notices a dead server and,
 // after a takeover, the new hub (a changed hubId) without a manual reload.
-export function useHubConnection(enabled: boolean, onHubChanged: () => void): HubConnectionStatus {
+export function useHubConnection(
+    initialHubId: string | null,
+    onHubChanged: () => void,
+): HubConnectionStatus {
     const [status, setStatus] = useState<HubConnectionStatus>("connected");
     const onHubChangedRef = useRef(onHubChanged);
     useEffect(() => {
@@ -18,11 +21,11 @@ export function useHubConnection(enabled: boolean, onHubChanged: () => void): Hu
     });
 
     useEffect(() => {
-        if (!enabled) return;
+        if (initialHubId === null) return;
         let disposed = false;
         let pollTimer: number | undefined;
         let badgeTimer: number | undefined;
-        let hubId: string | null = null;
+        let hubId = initialHubId;
         let failing = false;
 
         const schedule = (delayMs: number) => {
@@ -39,7 +42,7 @@ export function useHubConnection(enabled: boolean, onHubChanged: () => void): Hu
                 if (!res.ok) throw new Error(String(res.status));
                 const identity = (await res.json()) as HubIdentity;
                 if (disposed) return;
-                const changed = hubId !== null && identity.hubId !== hubId;
+                const changed = identity.hubId !== hubId;
                 hubId = identity.hubId;
                 if (failing) {
                     failing = false;
@@ -73,7 +76,7 @@ export function useHubConnection(enabled: boolean, onHubChanged: () => void): Hu
             window.clearTimeout(badgeTimer);
             document.removeEventListener("visibilitychange", onVisibility);
         };
-    }, [enabled]);
+    }, [initialHubId]);
 
     return status;
 }

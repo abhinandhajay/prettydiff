@@ -14,7 +14,7 @@ type RepoListState =
     // The hub API is unavailable (e.g. an older server): fall back to the
     // single-repo viewer with legacy storage keys and no dropdown.
     | { kind: "unavailable" }
-    | { kind: "ready"; repos: RepoInfo[] };
+    | { kind: "ready"; hubId: string; repos: RepoInfo[] };
 
 function repoIdFromUrl(): string | null {
     return new URLSearchParams(window.location.search).get("repo");
@@ -46,7 +46,7 @@ export default function App() {
                     res.repos[0];
                 setSelectedRepoId(initial?.id);
                 writeRepoIdToUrl(initial?.id);
-                setRepoList({ kind: "ready", repos: res.repos });
+                setRepoList({ kind: "ready", hubId: res.hubId, repos: res.repos });
             })
             .catch(() => {
                 if (!cancelled) setRepoList({ kind: "unavailable" });
@@ -59,7 +59,7 @@ export default function App() {
     const refreshRepos = useCallback((opts: { noteSwitch?: boolean } = {}) => {
         fetchRepos()
             .then((res) => {
-                setRepoList({ kind: "ready", repos: res.repos });
+                setRepoList({ kind: "ready", hubId: res.hubId, repos: res.repos });
                 const current = selectedRepoIdRef.current;
                 if (current && res.repos.some((repo) => repo.id === current)) return;
                 const fallback = res.repos.find((repo) => repo.isHub) ?? res.repos[0];
@@ -82,7 +82,10 @@ export default function App() {
     }, [refreshRepos]);
 
     const onHubChanged = useCallback(() => refreshRepos({ noteSwitch: true }), [refreshRepos]);
-    const status = useHubConnection(repoList.kind === "ready", onHubChanged);
+    const status = useHubConnection(
+        repoList.kind === "ready" ? repoList.hubId : null,
+        onHubChanged,
+    );
 
     useEffect(() => {
         if (status === "connected") setBannerNote(null);
