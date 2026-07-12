@@ -1,8 +1,7 @@
+import { DEFAULT_PORT, FALLBACK_PORT_END, FALLBACK_PORT_START } from "./port.js";
+
 import type { StartedServer } from "./server.js";
 import type { HubIdentity, RegisterResponse } from "./types.js";
-
-export const PORT_START = 39400;
-export const PORT_END = 39499;
 
 export interface HubTimings {
     probeTimeoutMs: number;
@@ -81,9 +80,13 @@ export async function discoverHub(options: {
         const identity = await probeHub(options.preferredPort, timeoutMs);
         return identity ? { port: options.preferredPort, identity } : null;
     }
-    const ports =
-        options.ports ??
-        Array.from({ length: PORT_END - PORT_START + 1 }, (_, i) => PORT_START + i);
+    const ports = options.ports ?? [
+        DEFAULT_PORT,
+        ...Array.from(
+            { length: FALLBACK_PORT_END - FALLBACK_PORT_START + 1 },
+            (_, i) => FALLBACK_PORT_START + i,
+        ),
+    ];
     const results = await Promise.all(
         ports.map(async (port) => ({ port, identity: await probeHub(port, timeoutMs) })),
     );

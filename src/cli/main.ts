@@ -14,7 +14,7 @@ Usage:
   prettydiff [options]
 
 Options:
-  --port <n>     Preferred port (default: auto in 39400-39499)
+  --port <n>     Preferred port (default: 3177, then auto-selected)
   --no-open      Do not open the browser automatically
   --standalone   Start a separate server instead of attaching to a running one
   --version      Print version and exit

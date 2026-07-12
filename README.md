@@ -45,12 +45,12 @@ The viewer opens in working-tree mode. Use the header controls to switch to bran
 
 Options:
 
-| Flag              | Description                                              |
-| ----------------- | -------------------------------------------------------- |
-| `--port <n>`      | Preferred port (default: auto-selected in `39400-39499`) |
-| `--no-open`       | Don't open the browser automatically                     |
-| `--version`, `-v` | Print version and exit                                   |
-| `--help`, `-h`    | Print help and exit                                      |
+| Flag              | Description                                                           |
+| ----------------- | --------------------------------------------------------------------- |
+| `--port <n>`      | Preferred port (default: `3177`, then auto-selected in `39400-39499`) |
+| `--no-open`       | Don't open the browser automatically                                  |
+| `--version`, `-v` | Print version and exit                                                |
+| `--help`, `-h`    | Print help and exit                                                   |
 
 `Ctrl-C` shuts down the server.
 

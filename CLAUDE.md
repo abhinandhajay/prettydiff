@@ -1,6 +1,6 @@
 ## What this is
 
-A Bun-based CLI (`prettydiff`) that detects working-tree changes in any Git repo, starts a local Hono server on a port in `39400-39499`, and serves a React + Vite web viewer with side-by-side / unified diff rendering. The CLI and the web viewer share TypeScript types and live in the same repo.
+A Bun-based CLI (`prettydiff`) that detects working-tree changes in any Git repo, starts a local Hono server on port `3177` (falling back to `39400-39499`), and serves a React + Vite web viewer with side-by-side / unified diff rendering. The CLI and the web viewer share TypeScript types and live in the same repo.
 
 ## Things to know
 
