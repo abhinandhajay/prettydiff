@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-07-13
+
+### Added
+
+- Multiple `prettydiff` instances can now share one local server, with a repository switcher in the viewer and a `--standalone` option when an isolated server is preferred.
+
+### Changed
+
+- The CLI now prefers port `3177`, falling back to the existing `39400-39499` range when needed.
+
 ## [0.6.0] - 2026-07-02
 
 ### Added
@@ -84,6 +94,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 - Detects modified, added, deleted, renamed, and untracked files.
 - Flags: `--port <n>`, `--no-open`, `--version` / `-v`, `--help` / `-h`.
 
+[0.7.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.7.0
 [0.6.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.6.0
 [0.5.1]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.5.1
 [0.5.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.5.0
