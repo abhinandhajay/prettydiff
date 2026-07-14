@@ -9,6 +9,7 @@ describe("parseArgs", () => {
             open: true,
             version: false,
             help: false,
+            standalone: false,
         });
     });
 
@@ -32,12 +33,17 @@ describe("parseArgs", () => {
         expect(parseArgs([flag]).help).toBe(true);
     });
 
+    test("--standalone starts a separate server", () => {
+        expect(parseArgs(["--standalone"]).standalone).toBe(true);
+    });
+
     test("combined flags", () => {
-        expect(parseArgs(["--no-open", "--port", "40000", "-v"])).toEqual({
+        expect(parseArgs(["--no-open", "--port", "40000", "-v", "--standalone"])).toEqual({
             port: 40000,
             open: false,
             version: true,
             help: false,
+            standalone: true,
         });
     });
 });
