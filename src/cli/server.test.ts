@@ -136,6 +136,6 @@ describe("close", () => {
     test("stops accepting connections", async () => {
         const srv = await startServer(repo, 0);
         await srv.close();
-        expect(fetch(`${srv.url}/api/diff`)).rejects.toThrow();
+        await expect(fetch(`${srv.url}/api/diff`)).rejects.toThrow();
     });
 });

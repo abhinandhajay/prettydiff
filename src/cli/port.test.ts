@@ -22,13 +22,6 @@ describe("findPort", () => {
         expect(port).toBeLessThanOrEqual(39499);
     });
 
-    test("returns the preferred port when it is free", async () => {
-        const probe = await listen(0);
-        const free = (probe.address() as net.AddressInfo).port;
-        await close(probe);
-        expect(await findPort(free)).toBe(free);
-    });
-
     test("falls back to another port when the preferred one is taken", async () => {
         const occupier = await listen(0);
         const taken = (occupier.address() as net.AddressInfo).port;

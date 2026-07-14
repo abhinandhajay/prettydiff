@@ -237,7 +237,7 @@ describe("getDiffPayload — working tree", () => {
     );
 
     test(
-        "oversized untracked file is skipped (surfaces as binary)",
+        "oversized untracked file is skipped as too-large",
         async () => {
             const repo = await trackedRepo();
             await commitFile(repo, "a.txt", "hello\n");
@@ -245,10 +245,8 @@ describe("getDiffPayload — working tree", () => {
             const payload = await getDiffPayload(repo);
             const file = fileByPath(payload!.files, "big.txt");
             expect(file.status).toBe("untracked");
-            // The synthesized skip patch contains a "Binary files … differ" line,
-            // which the binary detection matches before the size check — so the
-            // reason is "binary" rather than "too-large".
-            expect(file.skipped).toEqual({ reason: "binary" });
+            expect(file.binary).toBeUndefined();
+            expect(file.skipped).toEqual({ reason: "too-large" });
             expect(file.rawPatch).toBe("");
         },
         TIMEOUT,

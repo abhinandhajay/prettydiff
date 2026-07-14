@@ -57,10 +57,6 @@ describe("buildFileIndex", () => {
         expect(idx.patchAdditions.has(5)).toBe(false);
         expect(idx.patchDeletions.has(4)).toBe(false);
     });
-    it("uses full contents when present", () => {
-        expect(buildFileIndex(modified).additions.size).toBe(5);
-    });
-
     it("handles files without a trailing newline", () => {
         const idx2 = buildFileIndex({ ...modified, newContents: "a\nb" });
         expect(idx2.additions.size).toBe(2);

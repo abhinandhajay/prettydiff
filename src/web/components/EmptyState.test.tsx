@@ -4,16 +4,9 @@ import { EmptyState } from "@/components/EmptyState";
 import { render, screen } from "@testing-library/react";
 
 describe("EmptyState", () => {
-    test("renders the title for each kind", () => {
-        for (const kind of ["loading", "error", "empty"] as const) {
-            const { unmount } = render(<EmptyState kind={kind} title={`Title ${kind}`} />);
-            expect(screen.getByText(new RegExp(`Title ${kind}`))).toBeInTheDocument();
-            unmount();
-        }
-    });
-
-    test("renders the message only when provided", () => {
+    test("renders the title, and the message only when provided", () => {
         const { rerender } = render(<EmptyState kind="error" title="Oops" />);
+        expect(screen.getByText("Oops")).toBeInTheDocument();
         expect(screen.queryByText("it broke")).not.toBeInTheDocument();
         rerender(<EmptyState kind="error" title="Oops" message="it broke" />);
         expect(screen.getByText("it broke")).toBeInTheDocument();

@@ -37,6 +37,7 @@ interface Handlers {
     deletes: string[];
     copies: number;
     jumps: string[];
+    unmount: () => void;
 }
 
 function setup(overrides: {
@@ -51,8 +52,9 @@ function setup(overrides: {
         deletes: [],
         copies: 0,
         jumps: [],
+        unmount: () => {},
     };
-    render(
+    const view = render(
         <CommentsPanelContent
             comments={overrides.comments ?? comments}
             totalCount={overrides.totalCount ?? 4}
@@ -67,6 +69,7 @@ function setup(overrides: {
             onJumpToDiff={(id) => handlers.jumps.push(id)}
         />,
     );
+    handlers.unmount = view.unmount;
     return handlers;
 }
 
@@ -100,44 +103,15 @@ describe("CommentsPanelContent", () => {
     });
 
     test("file header checkbox reflects none/some/all selection", () => {
-        // none selected
-        const first = render(
-            <CommentsPanelContent
-                comments={comments}
-                totalCount={4}
-                selectedIds={new Set()}
-                onToggleSelected={() => {}}
-                onToggleFile={() => {}}
-                onEdit={() => {}}
-                onDelete={() => {}}
-                onCopy={() => {}}
-                scrollToId={null}
-                onScrollHandled={() => {}}
-                onJumpToDiff={() => {}}
-            />,
-        );
+        const none = setup({});
         expect(screen.getByLabelText("Select all comments in a.ts")).toHaveAttribute(
             "data-state",
             "unchecked",
         );
-        first.unmount();
+        none.unmount();
 
         // a.ts fully selected (a2 is stale so a1 alone is "all"), b.ts partially selected
-        render(
-            <CommentsPanelContent
-                comments={comments}
-                totalCount={4}
-                selectedIds={new Set(["a1", "b2"])}
-                onToggleSelected={() => {}}
-                onToggleFile={() => {}}
-                onEdit={() => {}}
-                onDelete={() => {}}
-                onCopy={() => {}}
-                scrollToId={null}
-                onScrollHandled={() => {}}
-                onJumpToDiff={() => {}}
-            />,
-        );
+        setup({ selectedIds: new Set(["a1", "b2"]) });
         expect(screen.getByLabelText("Select all comments in a.ts")).toHaveAttribute(
             "data-state",
             "checked",
@@ -186,7 +160,9 @@ describe("CommentsPanelContent", () => {
 
     test("selection excludes stale comments from the count", () => {
         setup({ selectedIds: new Set(["a1", "a2"]) });
-        expect(screen.getByText("1")).toBeInTheDocument();
+        expect(screen.getByText(/selected · ready to copy/)).toHaveTextContent(
+            "1 selected · ready to copy",
+        );
     });
 
     test("show in diff jumps to the comment", () => {

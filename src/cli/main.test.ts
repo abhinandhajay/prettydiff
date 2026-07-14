@@ -16,8 +16,8 @@ describe("parseArgs", () => {
         expect(parseArgs(["--port", "39412"]).port).toBe(39412);
     });
 
-    test("--port with a non-numeric value yields NaN", () => {
-        expect(Number.isNaN(parseArgs(["--port", "abc"]).port)).toBe(true);
+    test("--port with a non-numeric value is ignored", () => {
+        expect(parseArgs(["--port", "abc"]).port).toBeUndefined();
     });
 
     test("--no-open disables opening the browser", () => {

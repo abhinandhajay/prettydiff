@@ -12,7 +12,7 @@ describe("formatRelativeTime", () => {
     const cases: Array<[number, string]> = [
         [0, "just now"],
         [44 * SEC, "just now"],
-        [45 * SEC, "0m ago"],
+        [45 * SEC, "1m ago"],
         [60 * SEC, "1m ago"],
         [59 * MIN, "59m ago"],
         [60 * MIN, "1h ago"],
@@ -23,8 +23,8 @@ describe("formatRelativeTime", () => {
         [34 * DAY, "4w ago"],
         [35 * DAY, "1mo ago"],
         [359 * DAY, "11mo ago"],
-        // days 360-364 fall between the month and year buckets.
-        [360 * DAY, "0y ago"],
+        // days 360-364 fall past the last month bucket and round up to a year.
+        [360 * DAY, "1y ago"],
         [365 * DAY, "1y ago"],
         [730 * DAY, "2y ago"],
     ];

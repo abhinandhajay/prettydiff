@@ -87,7 +87,7 @@ describe("fetchDiff", () => {
 
     test("throws on non-ok responses", async () => {
         stubFetch(500);
-        expect(fetchDiff({ target: "working-tree" })).rejects.toThrow(
+        await expect(fetchDiff({ target: "working-tree" })).rejects.toThrow(
             "fetch /api/diff failed: 500",
         );
     });

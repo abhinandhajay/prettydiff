@@ -31,8 +31,9 @@ export function parseArgs(argv: string[]): Args {
         default: { open: true },
         alias: { h: "help", v: "version" },
     });
+    const port = Number(a.port);
     return {
-        port: a.port ? Number(a.port) : undefined,
+        port: a.port && Number.isFinite(port) ? port : undefined,
         open: a.open !== false,
         version: !!a.version,
         help: !!a.help,
