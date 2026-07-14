@@ -17,5 +17,5 @@
         "types": ["node"]
     },
     "include": ["src/cli/**/*.ts"],
-    "exclude": ["node_modules", "dist", "src/web", "src/cli/**/*.test.ts"]
+    "exclude": ["node_modules", "dist", "src/web", "src/cli/**/*.test.ts", "src/cli/testUtils.ts"]
 }

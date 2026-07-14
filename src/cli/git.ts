@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { lstat, readFile, readlink, stat } from "node:fs/promises";
+import { lstat, readFile, readlink, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 import parseDiffLib from "parse-diff";
@@ -53,7 +53,18 @@ export async function getRepoRoot(cwd: string): Promise<string | null> {
     }
 }
 
-async function getBranch(cwd: string): Promise<string> {
+// Realpathed so symlinked and real spellings of the same worktree hash to one repo id.
+export async function canonicalRepoRoot(cwd: string): Promise<string | null> {
+    const root = await getRepoRoot(cwd);
+    if (!root) return null;
+    try {
+        return await realpath(root);
+    } catch {
+        return root;
+    }
+}
+
+export async function getBranch(cwd: string): Promise<string> {
     try {
         const r = await run("git", ["rev-parse", "--abbrev-ref", "HEAD"], cwd);
         return r.stdout.trim();

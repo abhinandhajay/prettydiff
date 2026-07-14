@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
-import { repoBasename } from "@/lib/format";
+import { displayPath, repoBasename, repoDisplayLabels } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
     Check,
@@ -20,11 +20,16 @@ import {
     RefreshCw,
     WrapText,
 } from "lucide-react";
+import { useMemo } from "react";
 
-import type { DiffPayload } from "@/lib/types";
+import type { DiffPayload, RepoInfo } from "@/lib/types";
 
 interface Props {
     payload: DiffPayload;
+    repos: RepoInfo[];
+    selectedRepoId?: string;
+    onRepoChange: (id: string) => void;
+    reconnecting?: boolean;
     viewMode: ViewMode;
     onViewModeChange: (v: ViewMode) => void;
     wrap: boolean;
@@ -87,6 +92,10 @@ export function HeaderShell() {
 
 export function Header({
     payload,
+    repos,
+    selectedRepoId,
+    onRepoChange,
+    reconnecting,
     viewMode,
     onViewModeChange,
     wrap,
@@ -106,6 +115,11 @@ export function Header({
     const branchOptions = payload.branches.filter((branch) => !branch.current);
     const fallbackTargetRef = branchOptions[0]?.name ?? payload.branch;
     const selectedTargetRef = targetRef ?? payload.targetRef ?? fallbackTargetRef;
+    const repoLabels = useMemo(
+        () => repoDisplayLabels(repos.map((repo) => repo.repoRoot)),
+        [repos],
+    );
+    const selectedRepo = repos.find((repo) => repo.id === selectedRepoId);
     const directionTitle =
         target === "branch"
             ? `Changes ${payload.branch}${includeWorkingTree ? " and the working tree" : ""} would merge into ${selectedTargetRef}`
@@ -129,12 +143,62 @@ export function Header({
                 </div>
                 <Divider />
                 <div className="hidden min-w-0 items-center gap-2 md:flex">
-                    <span
-                        className="text-foreground/85 truncate text-[13px] font-medium"
-                        title={payload.repoRoot}
-                    >
-                        {repoBasename(payload.repoRoot)}
-                    </span>
+                    {repos.length > 0 ? (
+                        <Select
+                            value={selectedRepoId}
+                            onValueChange={onRepoChange}
+                            disabled={reconnecting}
+                        >
+                            <SelectTrigger
+                                aria-label="Repository"
+                                title={selectedRepo?.repoRoot ?? payload.repoRoot}
+                                className="text-foreground/85 hover:bg-muted/60 h-7 w-auto max-w-[240px] justify-start gap-1 border-0 bg-transparent px-1.5 text-[13px] font-medium shadow-none"
+                            >
+                                <SelectValue>
+                                    {selectedRepo
+                                        ? repoLabels.get(selectedRepo.repoRoot)
+                                        : repoBasename(payload.repoRoot)}
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent align="start" className="max-w-[360px]">
+                                {repos.map((repo) => (
+                                    <SelectItem
+                                        key={repo.id}
+                                        value={repo.id}
+                                        textValue={repoLabels.get(repo.repoRoot)}
+                                        title={repo.repoRoot}
+                                        className="py-1.5 [&>span:last-child]:w-full [&>span:last-child]:min-w-0"
+                                    >
+                                        <span className="flex min-w-0 flex-col gap-0.5">
+                                            <span className="flex min-w-0 items-center gap-2">
+                                                <span className="text-foreground truncate text-[12px] font-medium">
+                                                    {repoLabels.get(repo.repoRoot)}
+                                                </span>
+                                                {repo.branch ? (
+                                                    <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1 font-mono text-[10.5px]">
+                                                        <GitBranch className="size-3 shrink-0" />
+                                                        <span className="max-w-[140px] truncate">
+                                                            {repo.branch}
+                                                        </span>
+                                                    </span>
+                                                ) : null}
+                                            </span>
+                                            <span className="text-muted-foreground/70 truncate text-[10.5px]">
+                                                {displayPath(repo.repoRoot)}
+                                            </span>
+                                        </span>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <span
+                            className="text-foreground/85 truncate text-[13px] font-medium"
+                            title={payload.repoRoot}
+                        >
+                            {repoBasename(payload.repoRoot)}
+                        </span>
+                    )}
                     <ToggleGroup
                         type="single"
                         value={target}
@@ -245,7 +309,7 @@ export function Header({
                         variant="ghost"
                         size="sm"
                         onClick={onReload}
-                        disabled={isReloading}
+                        disabled={isReloading || reconnecting}
                         title="Reload diff"
                         className="text-muted-foreground hover:text-foreground size-8 px-0"
                     >
