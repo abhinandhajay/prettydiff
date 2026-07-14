@@ -203,28 +203,33 @@ async function getUntrackedFiles(cwd: string): Promise<string[]> {
     return r.stdout.split("\0").filter(Boolean);
 }
 
-async function synthesizeUntrackedPatch(cwd: string, relPath: string): Promise<string> {
+async function synthesizeUntrackedPatch(
+    cwd: string,
+    relPath: string,
+): Promise<{ patch: string; tooLarge?: boolean }> {
     const abs = path.join(cwd, relPath);
     let size = 0;
     try {
         const s = await stat(abs);
         size = s.size;
     } catch {
-        return "";
+        return { patch: "" };
     }
 
     if (size > MAX_UNTRACKED_BYTES) {
+        // Placeholder hunk keeps the file visible in the payload; the caller
+        // marks it too-large and clears the patch before serving.
         const kb = Math.round(size / 1024);
-        return [
+        const patch = [
             `diff --git a/${relPath} b/${relPath}`,
             `new file mode 100644`,
-            `Binary files /dev/null and b/${relPath} differ`,
             `--- /dev/null`,
             `+++ b/${relPath}`,
             `@@ -0,0 +1,1 @@`,
             `+[prettydiff: file skipped — ${kb} KB exceeds 512 KB limit]`,
             "",
         ].join("\n");
+        return { patch, tooLarge: true };
     }
 
     const r = await run(
@@ -233,14 +238,19 @@ async function synthesizeUntrackedPatch(cwd: string, relPath: string): Promise<s
         cwd,
         [0, 1],
     );
-    if (!r.stdout) return "";
+    if (!r.stdout) return { patch: "" };
 
-    return normalizeLineEndings(
-        r.stdout.replace(
-            new RegExp(`^diff --git a/${escapeRegex(NULL_DEVICE)} b/${escapeRegex(relPath)}`, "m"),
-            `diff --git a/${relPath} b/${relPath}`,
+    return {
+        patch: normalizeLineEndings(
+            r.stdout.replace(
+                new RegExp(
+                    `^diff --git a/${escapeRegex(NULL_DEVICE)} b/${escapeRegex(relPath)}`,
+                    "m",
+                ),
+                `diff --git a/${relPath} b/${relPath}`,
+            ),
         ),
-    );
+    };
 }
 
 function escapeRegex(s: string): string {
@@ -346,14 +356,16 @@ export async function getDiffPayload(
             .filter((rel) => !trackedPaths.has(rel))
             .map(async (rel) => ({
                 rel,
-                patch: await synthesizeUntrackedPatch(repoRoot, rel),
+                ...(await synthesizeUntrackedPatch(repoRoot, rel)),
             })),
     );
     const untrackedPaths = new Set<string>();
+    const oversizedPaths = new Set<string>();
     const untrackedPatches: string[] = [];
-    for (const { rel, patch } of synthesized) {
+    for (const { rel, patch, tooLarge } of synthesized) {
         if (patch) {
             untrackedPaths.add(rel);
+            if (tooLarge) oversizedPaths.add(rel);
             untrackedPatches.push(patch);
         }
     }
@@ -373,9 +385,11 @@ export async function getDiffPayload(
             const hasHunks = (p.chunks?.length ?? 0) > 0;
             const skipped: ParsedFile["skipped"] = isBinary
                 ? { reason: "binary" }
-                : !hasHunks
-                  ? { reason: "no-hunks" }
-                  : undefined;
+                : oversizedPaths.has(filePath)
+                  ? { reason: "too-large" }
+                  : !hasHunks
+                    ? { reason: "no-hunks" }
+                    : undefined;
             files.push({
                 path: filePath,
                 oldPath,

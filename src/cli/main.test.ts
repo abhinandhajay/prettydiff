@@ -1,0 +1,49 @@
+import { describe, expect, test } from "bun:test";
+
+import { parseArgs } from "./main.js";
+
+describe("parseArgs", () => {
+    test("defaults", () => {
+        expect(parseArgs([])).toEqual({
+            port: undefined,
+            open: true,
+            version: false,
+            help: false,
+            standalone: false,
+        });
+    });
+
+    test("--port parses a number", () => {
+        expect(parseArgs(["--port", "39412"]).port).toBe(39412);
+    });
+
+    test("--port with a non-numeric value is ignored", () => {
+        expect(parseArgs(["--port", "abc"]).port).toBeUndefined();
+    });
+
+    test("--no-open disables opening the browser", () => {
+        expect(parseArgs(["--no-open"]).open).toBe(false);
+    });
+
+    test.each([["-v"], ["--version"]])("%s sets version", (flag) => {
+        expect(parseArgs([flag]).version).toBe(true);
+    });
+
+    test.each([["-h"], ["--help"]])("%s sets help", (flag) => {
+        expect(parseArgs([flag]).help).toBe(true);
+    });
+
+    test("--standalone starts a separate server", () => {
+        expect(parseArgs(["--standalone"]).standalone).toBe(true);
+    });
+
+    test("combined flags", () => {
+        expect(parseArgs(["--no-open", "--port", "40000", "-v", "--standalone"])).toEqual({
+            port: 40000,
+            open: false,
+            version: true,
+            help: false,
+            standalone: true,
+        });
+    });
+});

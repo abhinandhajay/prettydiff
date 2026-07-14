@@ -55,7 +55,7 @@ export function formatRelativeTime(timestamp: number, now: number = Date.now()):
     const diff = Math.max(0, now - timestamp);
     const sec = Math.floor(diff / 1000);
     if (sec < 45) return "just now";
-    const min = Math.floor(sec / 60);
+    const min = Math.max(1, Math.floor(sec / 60));
     if (min < 60) return `${min}m ago`;
     const hr = Math.floor(min / 60);
     if (hr < 24) return `${hr}h ago`;
@@ -65,5 +65,5 @@ export function formatRelativeTime(timestamp: number, now: number = Date.now()):
     if (wk < 5) return `${wk}w ago`;
     const mo = Math.floor(day / 30);
     if (mo < 12) return `${mo}mo ago`;
-    return `${Math.floor(day / 365)}y ago`;
+    return `${Math.max(1, Math.floor(day / 365))}y ago`;
 }

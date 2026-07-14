@@ -35,6 +35,7 @@ export interface ServerOptions {
     version: string;
     hubId: string;
     registry: HubRegistry;
+    webRoot?: string;
 }
 
 // Loopback-only CSRF posture: mutating routes require a local Host (defeats DNS
@@ -59,7 +60,7 @@ async function readJson<T>(c: Context): Promise<T | null> {
 }
 
 export async function startServer(options: ServerOptions): Promise<StartedServer> {
-    const { port, version, hubId, registry } = options;
+    const { port, version, hubId, registry, webRoot = WEB_ROOT } = options;
     const app = new Hono();
 
     app.get("/api/hub", (c) => {
@@ -127,13 +128,13 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
     app.use(
         "/assets/*",
         serveStatic({
-            root: path.relative(process.cwd(), WEB_ROOT) || ".",
+            root: path.relative(process.cwd(), webRoot) || ".",
         }),
     );
 
     app.get("*", async (c) => {
         try {
-            const html = await readFile(path.join(WEB_ROOT, "index.html"), "utf8");
+            const html = await readFile(path.join(webRoot, "index.html"), "utf8");
             return c.html(html);
         } catch {
             return c.text("prettydiff: web bundle missing. Reinstall the package.", 500);
