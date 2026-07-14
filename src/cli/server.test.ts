@@ -5,39 +5,9 @@ import path from "node:path";
 
 import { HubRegistry, repoIdFor } from "./registry.js";
 import { startServer, type StartedServer } from "./server.js";
+import { makeGitRepo } from "./testUtils.js";
 
 import type { HubIdentity, HubReposResponse, RegisterResponse } from "./types.js";
-
-function git(args: string[], cwd: string): void {
-    const r = Bun.spawnSync(["git", ...args], {
-        cwd,
-        env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
-    });
-    if (r.exitCode !== 0) {
-        throw new Error(`git ${args.join(" ")} failed: ${r.stderr.toString()}`);
-    }
-}
-
-async function makeGitRepo(): Promise<string> {
-    const dir = await mkdtemp(path.join(os.tmpdir(), "prettydiff-srv-"));
-    git(["init", "-q"], dir);
-    git(
-        [
-            "-c",
-            "user.email=test@example.com",
-            "-c",
-            "user.name=test",
-            "commit",
-            "--allow-empty",
-            "-q",
-            "-m",
-            "init",
-        ],
-        dir,
-    );
-    // os.tmpdir() is a symlink on macOS; match the server's realpath canonicalization
-    return realpath(dir);
-}
 
 describe("hub server", () => {
     let hubRoot: string;

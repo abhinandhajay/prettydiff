@@ -1,11 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import { rm } from "node:fs/promises";
 
 import { discoverHub, probeHub, startInstance, type HubTimings } from "./hubClient.js";
 import { HubRegistry, repoIdFor } from "./registry.js";
 import { startServer, type StartedServer } from "./server.js";
+import { makeGitRepo } from "./testUtils.js";
 
 import type { InstanceController } from "./hubClient.js";
 import type { HubReposResponse } from "./types.js";
@@ -20,36 +19,6 @@ const TEST_TIMINGS: Partial<HubTimings> = {
     rejoinProbeAttempts: 10,
     rejoinProbeDelayMs: 50,
 };
-
-function git(args: string[], cwd: string): void {
-    const r = Bun.spawnSync(["git", ...args], {
-        cwd,
-        env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
-    });
-    if (r.exitCode !== 0) {
-        throw new Error(`git ${args.join(" ")} failed: ${r.stderr.toString()}`);
-    }
-}
-
-async function makeGitRepo(): Promise<string> {
-    const dir = await mkdtemp(path.join(os.tmpdir(), "prettydiff-hub-"));
-    git(["init", "-q"], dir);
-    git(
-        [
-            "-c",
-            "user.email=test@example.com",
-            "-c",
-            "user.name=test",
-            "commit",
-            "--allow-empty",
-            "-q",
-            "-m",
-            "init",
-        ],
-        dir,
-    );
-    return realpath(dir);
-}
 
 function makeHub(repoRoot: string, port = 0, hubId: string = crypto.randomUUID()) {
     const registry = new HubRegistry();

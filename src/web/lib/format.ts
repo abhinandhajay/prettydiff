@@ -1,5 +1,9 @@
+function pathSegments(p: string): string[] {
+    return p.replace(/\\/g, "/").split("/").filter(Boolean);
+}
+
 export function repoBasename(repoRoot: string): string {
-    return repoRoot.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+    return pathSegments(repoRoot).pop() ?? "";
 }
 
 export function displayPath(path: string): string {
@@ -10,7 +14,6 @@ export function displayPath(path: string): string {
 // (clones/worktrees of the same project) — as many trailing parent segments as
 // needed to tell them apart, VS Code style: "repo — a" vs "repo — b".
 export function repoDisplayLabels(repoRoots: string[]): Map<string, string> {
-    const segmentsFor = (root: string) => root.replace(/\\/g, "/").split("/").filter(Boolean);
     const labels = new Map<string, string>();
     const groups = new Map<string, string[]>();
     for (const root of repoRoots) {
@@ -24,12 +27,12 @@ export function repoDisplayLabels(repoRoots: string[]): Map<string, string> {
             labels.set(roots[0], base);
             continue;
         }
-        const maxDepth = Math.max(...roots.map((root) => segmentsFor(root).length - 1));
+        const maxDepth = Math.max(...roots.map((root) => pathSegments(root).length - 1));
         for (let depth = 1; depth <= Math.max(1, maxDepth); depth++) {
             const candidates = new Map<string, string>();
             const counts = new Map<string, number>();
             for (const root of roots) {
-                const segments = segmentsFor(root);
+                const segments = pathSegments(root);
                 const parents = segments.slice(
                     Math.max(0, segments.length - 1 - depth),
                     segments.length - 1,

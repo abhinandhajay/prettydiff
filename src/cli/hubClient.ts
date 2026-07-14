@@ -1,4 +1,4 @@
-import { DEFAULT_PORT, FALLBACK_PORT_END, FALLBACK_PORT_START } from "./port.js";
+import { candidatePorts } from "./port.js";
 
 import type { StartedServer } from "./server.js";
 import type { HubIdentity, RegisterResponse } from "./types.js";
@@ -80,15 +80,13 @@ export async function discoverHub(options: {
         const identity = await probeHub(options.preferredPort, timeoutMs);
         return identity ? { port: options.preferredPort, identity } : null;
     }
-    const ports = options.ports ?? [
-        DEFAULT_PORT,
-        ...Array.from(
-            { length: FALLBACK_PORT_END - FALLBACK_PORT_START + 1 },
-            (_, i) => FALLBACK_PORT_START + i,
-        ),
-    ];
+    // The hub almost always sits on the first candidate (the default port), so
+    // probe it alone before fanning out over the whole fallback range.
+    const [first, ...rest] = options.ports ?? candidatePorts();
+    const firstIdentity = await probeHub(first, timeoutMs);
+    if (firstIdentity) return { port: first, identity: firstIdentity };
     const results = await Promise.all(
-        ports.map(async (port) => ({ port, identity: await probeHub(port, timeoutMs) })),
+        rest.map(async (port) => ({ port, identity: await probeHub(port, timeoutMs) })),
     );
     for (const result of results) {
         if (result.identity) return { port: result.port, identity: result.identity };

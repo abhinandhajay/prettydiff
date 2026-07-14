@@ -34,6 +34,11 @@ export default function App() {
     const selectedRepoIdRef = useRef(selectedRepoId);
     selectedRepoIdRef.current = selectedRepoId;
 
+    const selectRepo = useCallback((id: string | undefined) => {
+        setSelectedRepoId(id);
+        writeRepoIdToUrl(id);
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
         fetchRepos()
@@ -44,8 +49,7 @@ export default function App() {
                     res.repos.find((repo) => repo.id === urlRepoId) ??
                     res.repos.find((repo) => repo.isHub) ??
                     res.repos[0];
-                setSelectedRepoId(initial?.id);
-                writeRepoIdToUrl(initial?.id);
+                selectRepo(initial?.id);
                 setRepoList({ kind: "ready", hubId: res.hubId, repos: res.repos });
             })
             .catch(() => {
@@ -54,26 +58,28 @@ export default function App() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [selectRepo]);
 
-    const refreshRepos = useCallback((opts: { noteSwitch?: boolean } = {}) => {
-        fetchRepos()
-            .then((res) => {
-                setRepoList({ kind: "ready", hubId: res.hubId, repos: res.repos });
-                const current = selectedRepoIdRef.current;
-                if (current && res.repos.some((repo) => repo.id === current)) return;
-                const fallback = res.repos.find((repo) => repo.isHub) ?? res.repos[0];
-                if (!fallback) return;
-                if (current && opts.noteSwitch) {
-                    setBannerNote(`switched to ${repoBasename(fallback.repoRoot)}`);
-                }
-                setSelectedRepoId(fallback.id);
-                writeRepoIdToUrl(fallback.id);
-            })
-            .catch(() => {
-                // keep the last known list; the connection banner covers a dead server
-            });
-    }, []);
+    const refreshRepos = useCallback(
+        (opts: { noteSwitch?: boolean } = {}) => {
+            fetchRepos()
+                .then((res) => {
+                    setRepoList({ kind: "ready", hubId: res.hubId, repos: res.repos });
+                    const current = selectedRepoIdRef.current;
+                    if (current && res.repos.some((repo) => repo.id === current)) return;
+                    const fallback = res.repos.find((repo) => repo.isHub) ?? res.repos[0];
+                    if (!fallback) return;
+                    if (current && opts.noteSwitch) {
+                        setBannerNote(`switched to ${repoBasename(fallback.repoRoot)}`);
+                    }
+                    selectRepo(fallback.id);
+                })
+                .catch(() => {
+                    // keep the last known list; the connection banner covers a dead server
+                });
+        },
+        [selectRepo],
+    );
 
     useEffect(() => {
         const onFocus = () => refreshRepos();
@@ -90,11 +96,6 @@ export default function App() {
     useEffect(() => {
         if (status === "connected") setBannerNote(null);
     }, [status]);
-
-    const selectRepo = useCallback((id: string) => {
-        setSelectedRepoId(id);
-        writeRepoIdToUrl(id);
-    }, []);
 
     if (repoList.kind === "loading") {
         return (
