@@ -1,4 +1,3 @@
-import { fileCardId } from "@/lib/slug";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import { ArrowUpToLine } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
@@ -224,10 +223,7 @@ export function FileTreePanelContent({ files, activePath, onScrollTo }: Props) {
                         title="Jump to top"
                         onClick={() => {
                             const first = files[0];
-                            if (first) {
-                                const card = document.getElementById(fileCardId(first.path));
-                                card?.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
+                            if (first) onScrollTo(first.path);
                         }}
                     >
                         <ArrowUpToLine className="size-3" />

@@ -103,6 +103,61 @@ function patchIndexesFromMeta(metaByPath: DiffRenderMeta["byPath"]): Map<string,
     return indexes;
 }
 
+// Smoothly scrolls `scroller` until `getOffset` (remaining distance to the
+// target, or null while the target hasn't rendered) reaches zero. Re-measures
+// every frame because lazy diff bodies use estimated heights until they
+// render, so a one-shot scrollIntoView can land off target. Velocity is a
+// low-pass filter over distance-proportional speed — smooth ramp-up, steady
+// middle — but the step is clamped to never pass the target: unclamped, the
+// filter is underdamped and rings around the destination. After landing it
+// keeps watching until the frame cap, because lazy bodies can render after
+// arrival and shift the target; aligned frames are no-ops. Any user scroll
+// input cancels immediately. Returns a cancel function.
+function animateScrollTo(scroller: HTMLElement, getOffset: () => number | null): () => void {
+    let cancelled = false;
+    let frames = 0;
+    let missing = 0;
+    let velocity = 0;
+    const cancel = () => {
+        cancelled = true;
+        scroller.removeEventListener("wheel", cancel);
+        scroller.removeEventListener("touchstart", cancel);
+        scroller.removeEventListener("mousedown", cancel);
+        scroller.removeEventListener("keydown", cancel);
+    };
+    scroller.addEventListener("wheel", cancel, { passive: true });
+    scroller.addEventListener("touchstart", cancel, { passive: true });
+    scroller.addEventListener("mousedown", cancel);
+    scroller.addEventListener("keydown", cancel);
+    const animate = () => {
+        if (cancelled) return;
+        if (frames++ > 240) {
+            cancel();
+            return;
+        }
+        const offset = getOffset();
+        if (offset === null) {
+            if (missing++ < 60) requestAnimationFrame(animate);
+            else cancel();
+            return;
+        }
+        if (Math.abs(offset) >= 0.5) {
+            velocity = velocity * 0.78 + offset * 0.18 * 0.22;
+            if (Math.abs(velocity) >= Math.abs(offset)) {
+                velocity = 0;
+                scroller.scrollTop += offset;
+            } else {
+                scroller.scrollTop += velocity;
+            }
+        } else {
+            velocity = 0;
+        }
+        requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+    return cancel;
+}
+
 interface DiffViewerProps {
     repoId?: string;
     repos: RepoInfo[];
@@ -397,37 +452,11 @@ export function DiffViewer({
         if (!scroller) return;
         // Cancel any in-flight file scroll so rapid clicks don't fight.
         fileScrollCancelRef.current?.();
-        let cancelled = false;
-        fileScrollCancelRef.current = () => {
-            cancelled = true;
-        };
-        // Re-measure every frame and drive the card's top to the scroller's top.
-        // Lazy diff bodies use estimated heights until they render, so a
-        // one-shot scrollIntoView can land off target. Re-targeting each frame
-        // converges to the exact position regardless. Same velocity-smoothed
-        // easing as the comment jump below.
-        let frames = 0;
-        let settle = 0;
-        let velocity = 0;
-        const animate = () => {
-            if (cancelled || frames++ > 240) return;
+        fileScrollCancelRef.current = animateScrollTo(scroller, () => {
             const el = document.getElementById(fileCardId(path));
-            if (!el) {
-                if (frames < 60) requestAnimationFrame(animate);
-                return;
-            }
-            const offset = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-            if (Math.abs(offset) < 0.5 && Math.abs(velocity) < 0.3) {
-                if (++settle > 3) return;
-            } else {
-                settle = 0;
-            }
-            const targetVelocity = offset * 0.18;
-            velocity = velocity * 0.78 + targetVelocity * 0.22;
-            scroller.scrollTop += velocity;
-            requestAnimationFrame(animate);
-        };
-        requestAnimationFrame(animate);
+            if (!el) return null;
+            return el.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+        });
     }, []);
 
     useEffect(() => () => fileScrollCancelRef.current?.(), []);
@@ -612,38 +641,18 @@ export function DiffViewer({
         if (!diffFlashCommentId) return;
         const scroller = mainRef.current;
         if (!scroller) return;
-        let cancelled = false;
-        let attempts = 0;
-        let frames = 0;
-        let velocity = 0;
-        const findEl = () => document.getElementById(commentIndicatorDomId(diffFlashCommentId));
-        // Velocity-smoothed reactive easing. Each frame's target velocity is
-        // proportional to remaining distance; actual velocity is a low-pass-
-        // filtered version, so motion ramps up smoothly at the start, holds
-        // a steady pace, and decelerates gently at the end — instead of
-        // pure exponential decay's snappy start and crawling tail.
-        const animate = () => {
-            if (cancelled || frames++ > 240) return;
-            const el = findEl();
-            if (!el) {
-                if (attempts++ < 60) requestAnimationFrame(animate);
-                return;
-            }
+        const cancel = animateScrollTo(scroller, () => {
+            const el = document.getElementById(commentIndicatorDomId(diffFlashCommentId));
+            if (!el) return null;
             const sRect = scroller.getBoundingClientRect();
             const rect = el.getBoundingClientRect();
-            const offset = rect.top + rect.height / 2 - (sRect.top + sRect.height / 2);
-            const targetVelocity = offset * 0.18;
-            velocity = velocity * 0.78 + targetVelocity * 0.22;
-            if (Math.abs(offset) < 0.5 && Math.abs(velocity) < 0.3) return;
-            scroller.scrollTop += velocity;
-            requestAnimationFrame(animate);
-        };
-        requestAnimationFrame(animate);
+            return rect.top + rect.height / 2 - (sRect.top + sRect.height / 2);
+        });
         const t = window.setTimeout(() => {
             setDiffFlashCommentId(null);
         }, 3000);
         return () => {
-            cancelled = true;
+            cancel();
             window.clearTimeout(t);
         };
     }, [diffFlashCommentId]);
