@@ -18,7 +18,7 @@ jobs:
 
             - uses: oven-sh/setup-bun@v2
               with:
-                  bun-version: 1.2.x
+                  bun-version-file: ".bun-version"
 
             - uses: actions/setup-node@v4
               with:
@@ -31,6 +31,15 @@ jobs:
                   tag_version="${VERSION#v}"
                   if [ "$pkg_version" != "$tag_version" ]; then
                     echo "::error::Tag $VERSION does not match package.json version $pkg_version"
+                    exit 1
+                  fi
+
+            - name: Verify Bun version
+              run: |
+                  expected=$(cat .bun-version)
+                  actual=$(bun --version)
+                  if [ "$actual" != "$expected" ]; then
+                    echo "::error::Bun version $actual does not match .bun-version $expected"
                     exit 1
                   fi
 
