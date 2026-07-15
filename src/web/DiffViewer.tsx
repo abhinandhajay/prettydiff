@@ -229,6 +229,7 @@ export function DiffViewer({
     const [largeDiffHint, setLargeDiffHint] = useState<{ files: number; lines: number } | null>(
         null,
     );
+    const [initialLoadPending, setInitialLoadPending] = useState(true);
     const [mountReady, setMountReady] = useState(false);
     const [stagedDiffCardCount, setStagedDiffCardCount] = useState(EAGER_DIFF_CARD_COUNT);
     const [completedFilePaths, setCompletedFilePaths] = useState<Set<string>>(new Set());
@@ -333,6 +334,7 @@ export function DiffViewer({
             if (mode === "reload") setIsReloading(true);
             if (mode === "initial") {
                 setIsReloading(false);
+                setInitialLoadPending(true);
                 setMountReady(false);
                 setStagedDiffCardCount(EAGER_DIFF_CARD_COUNT);
                 setCompletedFilePaths(new Set());
@@ -404,6 +406,7 @@ export function DiffViewer({
                             return next;
                         });
                     }
+                    if (mode === "initial") setInitialLoadPending(false);
                 })
                 .catch((e) => {
                     if (loadId !== loadIdRef.current) return;
@@ -413,6 +416,7 @@ export function DiffViewer({
                         onUnknownRepo();
                     }
                     if (mode === "initial") {
+                        setInitialLoadPending(false);
                         setLargeDiffHint(null);
                         setError(e?.message ?? String(e));
                     } else {
@@ -684,7 +688,7 @@ export function DiffViewer({
     }, [diffFlashCommentId]);
 
     useEffect(() => {
-        if (!payload) {
+        if (!payload || initialLoadPending) {
             setMountReady(false);
             return;
         }
@@ -695,7 +699,13 @@ export function DiffViewer({
         if (completedInitialFileCount < initialFilePaths.length) return;
         setMountReady(true);
         setLargeDiffHint(null);
-    }, [payload, largeDiffHint, completedInitialFileCount, initialFilePaths.length]);
+    }, [
+        payload,
+        initialLoadPending,
+        largeDiffHint,
+        completedInitialFileCount,
+        initialFilePaths.length,
+    ]);
 
     useEffect(() => {
         if (!payload) {
