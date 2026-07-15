@@ -231,6 +231,7 @@ export function DiffViewer({
     );
     const [mountReady, setMountReady] = useState(false);
     const [stagedDiffCardCount, setStagedDiffCardCount] = useState(EAGER_DIFF_CARD_COUNT);
+    const [completedFilePaths, setCompletedFilePaths] = useState<Set<string>>(new Set());
     const [animatePanel, setAnimatePanel] = useState(false);
 
     const mainRef = useRef<HTMLElement>(null);
@@ -334,6 +335,7 @@ export function DiffViewer({
                 setIsReloading(false);
                 setMountReady(false);
                 setStagedDiffCardCount(EAGER_DIFF_CARD_COUNT);
+                setCompletedFilePaths(new Set());
                 setLargeDiffHint(null);
             }
             fetchDiff({ target: requestTarget, targetRef, includeWorkingTree, repoId })
@@ -362,6 +364,13 @@ export function DiffViewer({
                     setPayload(p);
                     setFileRenderMeta(renderMeta);
                     setStagedDiffCardCount(EAGER_DIFF_CARD_COUNT);
+                    if (mode === "initial") {
+                        setCompletedFilePaths(
+                            new Set(
+                                p.files.filter((file) => file.skipped).map((file) => file.path),
+                            ),
+                        );
+                    }
                     if (stamped !== commentsRef.current) {
                         setComments(stamped);
                     }
@@ -499,6 +508,14 @@ export function DiffViewer({
     const sortedFiles = useMemo(() => (payload ? sortFilesForTree(payload.files) : []), [payload]);
     const shouldStageDiffPreload = shouldShowLargeDiffHint(fileRenderMeta.totalLines);
     const eagerDiffCardCount = shouldStageDiffPreload ? stagedDiffCardCount : sortedFiles.length;
+    const initialFilePaths = useMemo(
+        () => sortedFiles.slice(0, EAGER_DIFF_CARD_COUNT).map((file) => file.path),
+        [sortedFiles],
+    );
+    const completedInitialFileCount = initialFilePaths.reduce(
+        (count, path) => count + (completedFilePaths.has(path) ? 1 : 0),
+        0,
+    );
 
     const allExpanded = useMemo(
         () => (payload ? payload.files.every((f) => openMap[f.path] ?? true) : true),
@@ -509,6 +526,15 @@ export function DiffViewer({
         () => Object.values(comments).reduce((n, list) => n + list.length, 0),
         [comments],
     );
+
+    const markFileRenderComplete = useCallback((path: string) => {
+        setCompletedFilePaths((completed) => {
+            if (completed.has(path)) return completed;
+            const next = new Set(completed);
+            next.add(path);
+            return next;
+        });
+    }, []);
 
     const requestDraft = useCallback((draft: DraftLine) => {
         setActiveDraft(draft);
@@ -666,22 +692,10 @@ export function DiffViewer({
             setMountReady(true);
             return;
         }
-        type Win = Window & {
-            requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-            cancelIdleCallback?: (id: number) => void;
-        };
-        const win = window as Win;
-        const markReady = () => {
-            setMountReady(true);
-            setLargeDiffHint(null);
-        };
-        if (typeof win.requestIdleCallback === "function") {
-            const id = win.requestIdleCallback(markReady, { timeout: 1500 });
-            return () => win.cancelIdleCallback?.(id);
-        }
-        const id = window.setTimeout(markReady, 300);
-        return () => window.clearTimeout(id);
-    }, [payload, largeDiffHint]);
+        if (completedInitialFileCount < initialFilePaths.length) return;
+        setMountReady(true);
+        setLargeDiffHint(null);
+    }, [payload, largeDiffHint, completedInitialFileCount, initialFilePaths.length]);
 
     useEffect(() => {
         if (!payload) {
@@ -742,6 +756,7 @@ export function DiffViewer({
                             onEditComment={editComment}
                             onDeleteComment={deleteComment}
                             flashCommentId={diffFlashCommentId}
+                            onRenderComplete={markFileRenderComplete}
                         />
                     );
                 })}

@@ -76,6 +76,7 @@ interface Props {
     onEditComment: (id: string, body: string) => void;
     onDeleteComment: (id: string) => void;
     flashCommentId: string | null;
+    onRenderComplete: (path: string) => void;
 }
 
 const STATUS_VARIANT: Record<
@@ -145,6 +146,7 @@ function FileCardImpl({
     onEditComment,
     onDeleteComment,
     flashCommentId,
+    onRenderComplete,
 }: Props) {
     const { dir, base } = splitPath(file.path);
     const [renderPass, setRenderPass] = useState(0);
@@ -159,6 +161,11 @@ function FileCardImpl({
             });
         });
     }, []);
+
+    const markRenderComplete = useCallback(
+        () => onRenderComplete(file.path),
+        [file.path, onRenderComplete],
+    );
 
     useEffect(() => {
         setRenderPass(0);
@@ -357,12 +364,14 @@ function FileCardImpl({
                                 <DiffErrorBoundary
                                     key={file.path}
                                     fallback={<SkippedPreview reason="render-error" />}
+                                    onError={markRenderComplete}
                                 >
                                     <LazyDiffBody
                                         estimatedHeight={estimatedHeight}
                                         eager={eager}
                                         placeholder={commentPlaceholders}
                                         onRender={refreshDiffRender}
+                                        onSettled={markRenderComplete}
                                     >
                                         <div className="bg-card overflow-x-auto">
                                             <MultiFileDiff<AnnotationMeta>

@@ -3,6 +3,7 @@ import { Component, type ReactNode } from "react";
 interface Props {
     children: ReactNode;
     fallback: ReactNode;
+    onError?: () => void;
 }
 
 interface State {
@@ -18,6 +19,7 @@ export class DiffErrorBoundary extends Component<Props, State> {
 
     componentDidCatch(error: unknown) {
         console.error("Diff renderer failed to render:", error);
+        this.props.onError?.();
     }
 
     render() {

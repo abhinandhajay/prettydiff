@@ -6,6 +6,7 @@ interface Props {
     placeholder?: React.ReactNode;
     children: React.ReactNode;
     onRender: () => void;
+    onSettled: () => void;
 }
 
 const PRELOAD_MARGIN_PX = 6000;
@@ -16,6 +17,7 @@ export function LazyDiffBody({
     placeholder = null,
     children,
     onRender,
+    onSettled,
 }: Props) {
     const ref = useRef<HTMLDivElement | null>(null);
     const [shouldRender, setShouldRender] = useState(eager);
@@ -33,13 +35,14 @@ export function LazyDiffBody({
             }, 260);
             const settleId = window.setTimeout(() => {
                 setIsSettled(true);
+                onSettled();
             }, 360);
             return () => {
                 window.clearTimeout(renderId);
                 window.clearTimeout(settleId);
             };
         }
-    }, [onRender, shouldRender]);
+    }, [onRender, onSettled, shouldRender]);
 
     useEffect(() => {
         if (shouldRender) return;
