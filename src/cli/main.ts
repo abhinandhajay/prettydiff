@@ -10,6 +10,8 @@ import { checkForUpdate, detectInstaller, formatUpdateNotice } from "./update.js
 
 const HELP = `prettydiff — open the working-tree diff of any git repo in a local web viewer
 
+The local server also exposes a review-only MCP endpoint at /mcp.
+
 Usage:
   prettydiff [options]
 
@@ -43,6 +45,14 @@ export function parseArgs(argv: string[]): Args {
         version: !!a.version,
         help: !!a.help,
     };
+}
+
+export function mcpUrl(viewerUrl: string): string {
+    const url = new URL(viewerUrl);
+    url.pathname = "/mcp";
+    url.search = "";
+    url.hash = "";
+    return url.toString();
 }
 
 async function readVersion(): Promise<string> {
@@ -96,6 +106,7 @@ export async function main(argv: string[]): Promise<number> {
             `prettydiff: attached to running server — ${instance.url}  (ctrl-c to detach)\n`,
         );
     }
+    process.stdout.write(`prettydiff: MCP server ${mcpUrl(instance.url)}\n`);
 
     if (args.open) {
         open(instance.url).catch(() => {

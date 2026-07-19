@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseArgs } from "./main.js";
+import { mcpUrl, parseArgs } from "./main.js";
+
+test("mcpUrl removes repo-scoped viewer parameters", () => {
+    expect(mcpUrl("http://127.0.0.1:3177/?repo=abc123")).toBe("http://127.0.0.1:3177/mcp");
+});
 
 describe("parseArgs", () => {
     test("defaults", () => {

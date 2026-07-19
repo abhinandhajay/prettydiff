@@ -14,6 +14,8 @@ A refined local web viewer for your Git changes. Run `prettydiff` inside any Git
 - Branch mode shows everything your current branch would introduce to a selected base branch (local or remote), like a PR diff, with a toggle for including uncommitted and untracked changes
 - File-tree sidebar with status indicators and addition/deletion counts
 - Inline comments on diff lines with edit/delete controls
+- Persistent shared comments that browsers and AI agents can review together
+- Review-only MCP server for diff context and comment workflows
 - Comments sidebar with jump-to-line navigation and AI-ready copy
 - Reload, line-wrap, and expand/collapse controls
 - Detects modified, added, deleted, renamed, and untracked files
@@ -49,10 +51,37 @@ Options:
 | ----------------- | --------------------------------------------------------------------- |
 | `--port <n>`      | Preferred port (default: `3177`, then auto-selected in `39400-39499`) |
 | `--no-open`       | Don't open the browser automatically                                  |
+| `--standalone`    | Start an isolated server instead of attaching to the shared hub       |
 | `--version`, `-v` | Print version and exit                                                |
 | `--help`, `-h`    | Print help and exit                                                   |
 
 `Ctrl-C` shuts down the server.
+
+## MCP server
+
+Every prettydiff server also exposes a review-only [Model Context Protocol](https://modelcontextprotocol.io/) endpoint. The CLI prints its exact URL on startup:
+
+```text
+prettydiff: MCP server http://127.0.0.1:3177/mcp
+```
+
+Point any Streamable HTTP MCP client at that URL. A typical URL-based configuration looks like:
+
+```json
+{
+    "mcpServers": {
+        "prettydiff": {
+            "url": "http://127.0.0.1:3177/mcp"
+        }
+    }
+}
+```
+
+Use the printed URL rather than assuming port `3177`, because prettydiff can select a fallback port. The MCP server can list every repository attached to the shared hub, summarize a working-tree or branch diff, read individual patches and bounded repository files, and read or manage review comments. It cannot edit source files, execute commands, stage changes, commit, or mutate Git state.
+
+Comments are stored outside the repository in the operating system's application-data directory and are shared between the web viewer and MCP clients. Set `PRETTYDIFF_DATA_DIR` to override that location. Existing browser-only comments are merged into the shared store the first time that repo is opened after upgrading.
+
+Both the web viewer and MCP endpoint bind to `127.0.0.1` and validate the request Host header. They are not exposed to the local network and do not use remote authentication.
 
 prettydiff prints a one-line update notice on startup when a newer version is on npm. Set `PRETTYDIFF_NO_UPDATE_CHECK=1` to disable.
 

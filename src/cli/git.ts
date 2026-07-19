@@ -86,7 +86,10 @@ async function getBranches(cwd: string, currentBranch: string): Promise<BranchRe
             const name = line.trim();
             if (!name || name.endsWith("/HEAD") || seen.has(name)) continue;
             seen.add(name);
-            branches.push({ name, ...(name === currentBranch ? { current: true } : {}) });
+            branches.push({
+                name,
+                ...(name === currentBranch ? { current: true } : {}),
+            });
         }
         if (currentBranch && currentBranch !== "HEAD" && currentBranch !== "(detached)") {
             if (!seen.has(currentBranch)) {
@@ -114,10 +117,12 @@ async function getTrackedDiff(
     cwd: string,
     baseRef: string,
     newRef: string | null,
+    filePaths?: string[],
 ): Promise<string> {
     const r = await run(
         "git",
         [
+            ...(filePaths ? ["--literal-pathspecs"] : []),
             "diff",
             baseRef,
             ...(newRef ? [newRef] : []),
@@ -126,6 +131,7 @@ async function getTrackedDiff(
             "--ignore-cr-at-eol",
             "--src-prefix=a/",
             "--dst-prefix=b/",
+            ...(filePaths ? ["--", ...filePaths] : []),
         ],
         cwd,
     );
@@ -197,8 +203,19 @@ async function loadFileSides(
     };
 }
 
-async function getUntrackedFiles(cwd: string): Promise<string[]> {
-    const r = await run("git", ["ls-files", "--others", "--exclude-standard", "-z"], cwd);
+async function getUntrackedFiles(cwd: string, filePaths?: string[]): Promise<string[]> {
+    const r = await run(
+        "git",
+        [
+            ...(filePaths ? ["--literal-pathspecs"] : []),
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            ...(filePaths ? ["--", ...filePaths] : []),
+        ],
+        cwd,
+    );
     if (!r.stdout) return [];
     return r.stdout.split("\0").filter(Boolean);
 }
@@ -291,7 +308,10 @@ function inferStatus(parsed: parseDiffLib.File, isUntracked: boolean): FileStatu
     return "modified";
 }
 
-function normalizePath(parsed: parseDiffLib.File): { path: string; oldPath?: string } {
+function normalizePath(parsed: parseDiffLib.File): {
+    path: string;
+    oldPath?: string;
+} {
     const to = parsed.to;
     const from = parsed.from;
     if (parsed.deleted && from) return { path: from };
@@ -330,11 +350,40 @@ export async function getDiffPayload(
     cwd: string,
     requestedOptions: Partial<DiffOptions> = {},
 ): Promise<DiffPayload | null> {
-    const repoRoot = await getRepoRoot(cwd);
+    return buildDiffPayload(cwd, requestedOptions);
+}
+
+export async function getDiffPayloadForFiles(
+    cwd: string,
+    filePaths: string[],
+    requestedOptions: Partial<DiffOptions> = {},
+): Promise<DiffPayload | null> {
+    return buildDiffPayload(cwd, requestedOptions, [...new Set(filePaths)]);
+}
+
+export async function getDiffFile(
+    repoRoot: string,
+    filePath: string,
+    requestedOptions: Partial<DiffOptions> = {},
+): Promise<ParsedFile | undefined> {
+    const payload = await buildDiffPayload(repoRoot, requestedOptions, [filePath], true);
+    return payload?.files.find((file) => file.path === filePath);
+}
+
+async function buildDiffPayload(
+    cwd: string,
+    requestedOptions: Partial<DiffOptions>,
+    filePaths?: string[],
+    minimalMetadata = false,
+): Promise<DiffPayload | null> {
+    const repoRoot = minimalMetadata ? cwd : await getRepoRoot(cwd);
     if (!repoRoot) return null;
 
-    const [branch, head] = await Promise.all([getBranch(repoRoot), getHead(repoRoot)]);
     const target = requestedOptions.target ?? "working-tree";
+    const [branch, head] = await Promise.all([
+        minimalMetadata && target !== "branch" ? Promise.resolve("") : getBranch(repoRoot),
+        minimalMetadata ? Promise.resolve("") : getHead(repoRoot),
+    ]);
     const targetRef =
         target === "branch"
             ? await resolveTargetRef(repoRoot, requestedOptions.targetRef, branch)
@@ -343,11 +392,17 @@ export async function getDiffPayload(
     const baseRef = target === "branch" ? (mergeBase ?? targetRef ?? "HEAD") : "HEAD";
     const includeWorkingTree = target !== "branch" || (requestedOptions.includeWorkingTree ?? true);
     const newRef = includeWorkingTree ? null : "HEAD";
+    const hasPathFilter = filePaths !== undefined;
+    const hasPaths = (filePaths?.length ?? 0) > 0;
 
     const [trackedPatch, untrackedList, branches] = await Promise.all([
-        getTrackedDiff(repoRoot, baseRef, newRef),
-        includeWorkingTree ? getUntrackedFiles(repoRoot) : Promise.resolve([]),
-        getBranches(repoRoot, branch),
+        hasPathFilter && !hasPaths
+            ? Promise.resolve("")
+            : getTrackedDiff(repoRoot, baseRef, newRef, filePaths),
+        includeWorkingTree && (!hasPathFilter || hasPaths)
+            ? getUntrackedFiles(repoRoot, filePaths)
+            : Promise.resolve([]),
+        minimalMetadata ? Promise.resolve([]) : getBranches(repoRoot, branch),
     ]);
 
     const trackedPaths = getPatchPaths(trackedPatch);
