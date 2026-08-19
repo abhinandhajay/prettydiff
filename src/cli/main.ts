@@ -1,24 +1,40 @@
 import mri from "mri";
 import open from "open";
 
+import { runCommentsCommand } from "./comments.js";
 import { canonicalRepoRoot } from "./git.js";
 import { startInstance } from "./hubClient.js";
 import { findPort } from "./port.js";
 import { HubRegistry } from "./registry.js";
 import { startServer } from "./server.js";
+import { runSkillCommand } from "./skill.js";
 import { checkForUpdate, detectInstaller, formatUpdateNotice } from "./update.js";
 
-const HELP = `prettydiff — open the working-tree diff of any git repo in a local web viewer
+export const HELP = `prettydiff — view Git changes and share review comments
 
 Usage:
-  prettydiff [options]
+  prettydiff [viewer options]
+  prettydiff comments <command> [options]
+  prettydiff skill install [options]
 
-Options:
+Commands:
+  comments       List, add, update, or delete shared comments
+  skill install  Install the packaged prettydiff-cli agent skill
+
+Viewer options:
   --port <n>     Preferred port (default: 3177, then auto-selected)
   --no-open      Do not open the browser automatically
   --standalone   Start a separate server instead of attaching to a running one
-  --version      Print version and exit
-  --help         Print this help and exit
+  --version, -v  Print version and exit
+  --help, -h     Print this help and exit
+
+Examples:
+  prettydiff
+  prettydiff comments list
+  prettydiff comments add --help
+  prettydiff skill install --agent all
+
+Run "prettydiff comments --help" or "prettydiff skill --help" for more details.
 `;
 
 interface Args {
@@ -27,6 +43,12 @@ interface Args {
     standalone: boolean;
     version: boolean;
     help: boolean;
+}
+
+interface MainOptions {
+    cwd?: string;
+    stdout?: (text: string) => void;
+    stderr?: (text: string) => void;
 }
 
 export function parseArgs(argv: string[]): Args {
@@ -55,21 +77,37 @@ async function readVersion(): Promise<string> {
     }
 }
 
-export async function main(argv: string[]): Promise<number> {
+export async function main(argv: string[], options: MainOptions = {}): Promise<number> {
+    const stdout = options.stdout ?? ((text: string) => process.stdout.write(text));
+    const stderr = options.stderr ?? ((text: string) => process.stderr.write(text));
+    const cwd = options.cwd ?? process.cwd();
+    const command = argv[0];
+
+    if (command === "comments") {
+        return runCommentsCommand(argv.slice(1), { cwd, stdout, stderr });
+    }
+    if (command === "skill") {
+        return runSkillCommand(argv.slice(1), { stdout, stderr });
+    }
+    if (command && !command.startsWith("-")) {
+        stderr(`prettydiff: unknown command: ${command}\nRun "prettydiff --help" for usage.\n`);
+        return 2;
+    }
+
     const args = parseArgs(argv);
     if (args.help) {
-        process.stdout.write(HELP);
+        stdout(HELP);
         return 0;
     }
     const version = await readVersion();
     if (args.version) {
-        process.stdout.write(version + "\n");
+        stdout(version + "\n");
         return 0;
     }
 
-    const repoRoot = await canonicalRepoRoot(process.cwd());
+    const repoRoot = await canonicalRepoRoot(cwd);
     if (!repoRoot) {
-        process.stderr.write("prettydiff: not a git repository\n");
+        stderr("prettydiff: not a git repository\n");
         return 1;
     }
 
@@ -86,15 +124,13 @@ export async function main(argv: string[]): Promise<number> {
             return startServer({ port, version, hubId: crypto.randomUUID(), registry });
         },
         findFreePort: findPort,
-        log: (message) => process.stdout.write(message + "\n"),
+        log: (message) => stdout(message + "\n"),
     });
 
     if (instance.mode === "hub") {
-        process.stdout.write(`prettydiff: serving on ${instance.url}  (ctrl-c to quit)\n`);
+        stdout(`prettydiff: serving on ${instance.url}  (ctrl-c to quit)\n`);
     } else {
-        process.stdout.write(
-            `prettydiff: attached to running server — ${instance.url}  (ctrl-c to detach)\n`,
-        );
+        stdout(`prettydiff: attached to running server — ${instance.url}  (ctrl-c to detach)\n`);
     }
 
     if (args.open) {
@@ -106,7 +142,7 @@ export async function main(argv: string[]): Promise<number> {
     checkForUpdate(version)
         .then((latest) => {
             if (!latest) return;
-            process.stdout.write(formatUpdateNotice(version, latest, detectInstaller()));
+            stdout(formatUpdateNotice(version, latest, detectInstaller()));
         })
         .catch(() => {
             // ignore — update check is best-effort

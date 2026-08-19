@@ -1,0 +1,4 @@
+interface:
+    display_name: "Pretty Diff CLI"
+    short_description: "Manage shared Pretty Diff comments"
+    default_prompt: "Use $prettydiff-cli to manage shared review comments with the Pretty Diff CLI."

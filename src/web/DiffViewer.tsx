@@ -8,16 +8,11 @@ import {
     type ReviewSidebarTab,
 } from "@/components/ReviewSidebar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import {
-    allCommentIds,
-    buildFileIndex,
-    commentKey,
-    formatCommentsForCopy,
-    markStaleComments,
-} from "@/lib/comments";
+import { allCommentIds, buildFileIndex, commentKey, formatCommentsForCopy } from "@/lib/comments";
 import { fetchDiff, FetchDiffError } from "@/lib/fetchDiff";
 import { fileCardId } from "@/lib/slug";
 import { sortFilesForTree } from "@/lib/treeSort";
+import { useComments } from "@/lib/useComments";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,14 +20,7 @@ import { flushSync } from "react-dom";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
-import type {
-    CommentMap,
-    DiffComment,
-    DiffPayload,
-    DraftLine,
-    ParsedFile,
-    RepoInfo,
-} from "@/lib/types";
+import type { DiffComment, DiffPayload, DraftLine, ParsedFile, RepoInfo } from "@/lib/types";
 import type * as React from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 
@@ -95,12 +83,6 @@ function buildRenderMeta(files: ParsedFile[]): DiffRenderMeta {
         });
     }
     return { byPath, totalLines };
-}
-
-function patchIndexesFromMeta(metaByPath: DiffRenderMeta["byPath"]): Map<string, PatchLineIndex> {
-    const indexes = new Map<string, PatchLineIndex>();
-    for (const [path, meta] of metaByPath) indexes.set(path, meta.patchIndex);
-    return indexes;
 }
 
 // Smoothly scrolls `scroller` until `getOffset` (remaining distance to the
@@ -201,10 +183,14 @@ export function DiffViewer({
     const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
     const [activePath, setActivePath] = useState<string | null>(null);
 
-    const [comments, setComments] = usePersistedState<CommentMap>(
-        storageKey(repoId, "comments"),
-        {},
-    );
+    const {
+        comments,
+        error: commentError,
+        refresh: refreshComments,
+        create: createComment,
+        update: updateStoredComment,
+        remove: removeStoredComment,
+    } = useComments({ repoId, target, targetRef, includeWorkingTree });
     const [leftPanelOpen, setLeftPanelOpen] = usePersistedState<boolean>(
         "prettydiff:left-panel-open",
         true,
@@ -360,10 +346,10 @@ export function DiffViewer({
                             if (loadId !== loadIdRef.current) return;
                         }
                     }
-                    const indexByPath = patchIndexesFromMeta(renderMeta.byPath);
-                    const stamped = markStaleComments(commentsRef.current, p.files, indexByPath);
+                    const stamped = commentsRef.current;
                     if (loadId !== loadIdRef.current) return;
                     setPayload(p);
+                    refreshComments().catch(() => {});
                     setFileRenderMeta(renderMeta);
                     setStagedDiffCardCount(EAGER_DIFF_CARD_COUNT);
                     if (mode === "initial") {
@@ -372,9 +358,6 @@ export function DiffViewer({
                                 p.files.filter((file) => file.skipped).map((file) => file.path),
                             ),
                         );
-                    }
-                    if (stamped !== commentsRef.current) {
-                        setComments(stamped);
                     }
                     if (mode === "initial") {
                         const init: Record<string, boolean> = {};
@@ -428,7 +411,7 @@ export function DiffViewer({
                     if (mode === "reload") setIsReloading(false);
                 });
         },
-        [setComments, target, targetRef, includeWorkingTree, repoId, onUnknownRepo],
+        [target, targetRef, includeWorkingTree, repoId, onUnknownRepo, refreshComments],
     );
 
     useEffect(() => {
@@ -553,53 +536,28 @@ export function DiffViewer({
             if (!activeDraft) return;
             const trimmed = body.trim();
             if (!trimmed) return;
-            const id = crypto.randomUUID();
-            const comment: DiffComment = {
-                id,
-                filePath: activeDraft.filePath,
-                side: activeDraft.side,
-                lineNumber: activeDraft.lineNumber,
-                lineType: activeDraft.lineType,
-                lineText: activeDraft.lineText,
-                body: trimmed,
-                createdAt: Date.now(),
-            };
-            const current = commentsRef.current;
-            const existing = current[activeDraft.filePath] ?? [];
-            setComments({ ...current, [activeDraft.filePath]: [...existing, comment] });
-            setSelectedCommentIds((selected) => {
-                const next = new Set(selected);
-                next.add(id);
-                return next;
-            });
-            setActiveDraft(null);
-            setReviewPanelOpen(true);
-            setLeftPanelTab("comments");
+            createComment(activeDraft, trimmed)
+                .then((comment) => {
+                    setSelectedCommentIds((selected) => new Set(selected).add(comment.id));
+                    setActiveDraft(null);
+                    setReviewPanelOpen(true);
+                    setLeftPanelTab("comments");
+                })
+                .catch(() => {});
         },
-        [activeDraft, setComments, setLeftPanelTab, setReviewPanelOpen],
+        [activeDraft, createComment, setLeftPanelTab, setReviewPanelOpen],
     );
 
     const editComment = useCallback(
         (id: string, body: string) => {
-            const current = commentsRef.current;
-            const next: CommentMap = {};
-            for (const [path, list] of Object.entries(current)) {
-                next[path] = list.map((c) => (c.id === id ? { ...c, body } : c));
-            }
-            setComments(next);
+            updateStoredComment(id, body).catch(() => {});
         },
-        [setComments],
+        [updateStoredComment],
     );
 
     const deleteComment = useCallback(
         (id: string) => {
-            const current = commentsRef.current;
-            const next: CommentMap = {};
-            for (const [path, list] of Object.entries(current)) {
-                const filtered = list.filter((c) => c.id !== id);
-                if (filtered.length > 0) next[path] = filtered;
-            }
-            setComments(next);
+            removeStoredComment(id).catch(() => {});
             setSelectedCommentIds((selected) => {
                 if (!selected.has(id)) return selected;
                 const next = new Set(selected);
@@ -607,7 +565,7 @@ export function DiffViewer({
                 return next;
             });
         },
-        [setComments],
+        [removeStoredComment],
     );
 
     const toggleSelected = useCallback((id: string) => {
@@ -910,6 +868,11 @@ export function DiffViewer({
                     </ResizablePanelGroup>
                 )}
                 {overlay}
+                {commentError ? (
+                    <div className="bg-destructive text-destructive-foreground absolute right-4 bottom-4 z-50 max-w-md rounded-md px-3 py-2 text-xs shadow-lg">
+                        Comments unavailable: {commentError}
+                    </div>
+                ) : null}
             </div>
         </div>
     );

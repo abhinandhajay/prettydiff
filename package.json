@@ -24,6 +24,7 @@
     "files": [
         "dist/cli",
         "dist/web",
+        "skills/prettydiff-cli",
         "CHANGELOG.md"
     ],
     "type": "module",

@@ -191,4 +191,19 @@ describe("CommentsPanelContent", () => {
         fireEvent.click(screen.getAllByTitle("Delete comment")[0]!);
         expect(handlers.deletes).toEqual(["a1"]);
     });
+
+    test("labels agent-authored comments", () => {
+        setup({
+            comments: {
+                "a.ts": [
+                    makeComment({
+                        id: "agent",
+                        author: { kind: "agent", name: "Codex" },
+                    }),
+                ],
+            },
+            totalCount: 1,
+        });
+        expect(screen.getByText("Codex")).toBeInTheDocument();
+    });
 });

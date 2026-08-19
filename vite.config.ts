@@ -116,12 +116,111 @@ export default defineConfig({
         {
             name: "prettydiff-dev-fixture",
             configureServer(server) {
+                const commentsByRepo = new Map<
+                    string,
+                    { revision: number; comments: Record<string, unknown[]> }
+                >();
                 server.middlewares.use(async (req, res, next) => {
                     const sendJson = (body: unknown, status = 200) => {
                         res.statusCode = status;
                         res.setHeader("content-type", "application/json");
                         res.end(JSON.stringify(body));
                     };
+                    const readBody = async () => {
+                        const chunks: Buffer[] = [];
+                        for await (const chunk of req) chunks.push(Buffer.from(chunk));
+                        return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+                    };
+                    if (req.url && req.url.startsWith("/api/comments")) {
+                        const url = new URL(req.url, "http://localhost");
+                        const repoId = url.searchParams.get("repo") ?? "fixture-a";
+                        const snapshot = commentsByRepo.get(repoId) ?? {
+                            revision: 0,
+                            comments: {},
+                        };
+                        const save = (comments: Record<string, unknown[]>) => {
+                            const next = { revision: snapshot.revision + 1, comments };
+                            commentsByRepo.set(repoId, next);
+                            sendJson(next);
+                        };
+                        if (req.method === "GET") {
+                            const etag = `"${snapshot.revision}"`;
+                            if (req.headers["if-none-match"] === etag) {
+                                res.statusCode = 304;
+                                res.end();
+                            } else {
+                                res.setHeader("etag", etag);
+                                sendJson(snapshot);
+                            }
+                            return;
+                        }
+                        const body = (await readBody()) as Record<string, unknown>;
+                        if (req.method === "POST" && url.pathname.endsWith("/import")) {
+                            const merged = structuredClone(snapshot.comments);
+                            const known = new Set(
+                                Object.values(merged)
+                                    .flat()
+                                    .map((item) => (item as { id?: string }).id),
+                            );
+                            for (const [filePath, list] of Object.entries(
+                                (body.comments as Record<string, unknown[]>) ?? {},
+                            )) {
+                                for (const item of list) {
+                                    const comment = item as { id?: string; author?: unknown };
+                                    if (!comment.id || known.has(comment.id)) continue;
+                                    comment.author ??= { kind: "user" };
+                                    (merged[filePath] ??= []).push(comment);
+                                    known.add(comment.id);
+                                }
+                            }
+                            save(merged);
+                            return;
+                        }
+                        if (req.method === "POST" && url.pathname === "/api/comments") {
+                            const comment = {
+                                ...body,
+                                id: typeof body.id === "string" ? body.id : crypto.randomUUID(),
+                                createdAt: Date.now(),
+                                author: { kind: "user" },
+                            };
+                            const merged = structuredClone(snapshot.comments);
+                            ((merged[body.filePath as string] ??= []) as unknown[]).push(comment);
+                            const next = {
+                                revision: snapshot.revision + 1,
+                                comments: merged,
+                                comment,
+                            };
+                            commentsByRepo.set(repoId, next);
+                            sendJson(next);
+                            return;
+                        }
+                        const id = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
+                        const merged: Record<string, unknown[]> = {};
+                        let found = false;
+                        for (const [filePath, list] of Object.entries(snapshot.comments)) {
+                            const changed = list
+                                .filter((item) => {
+                                    if (req.method !== "DELETE") return true;
+                                    const match = (item as { id?: string }).id === id;
+                                    found ||= match;
+                                    return !match;
+                                })
+                                .map((item) => {
+                                    if (
+                                        req.method === "PATCH" &&
+                                        (item as { id?: string }).id === id
+                                    ) {
+                                        found = true;
+                                        return { ...(item as object), body: body.body };
+                                    }
+                                    return item;
+                                });
+                            if (changed.length) merged[filePath] = changed;
+                        }
+                        if (!found) sendJson({ error: "comment not found" }, 404);
+                        else save(merged);
+                        return;
+                    }
                     if (req.url && req.url.startsWith("/api/hub/repos")) {
                         sendJson({ hubId: DEV_HUB_ID, repos: DEV_REPOS });
                         return;

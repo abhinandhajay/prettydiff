@@ -37,6 +37,39 @@ export interface DiffPayload {
     files: ParsedFile[];
 }
 
+export type CommentSide = "additions" | "deletions";
+
+export type CommentLineType =
+    | "change-addition"
+    | "change-deletion"
+    | "context"
+    | "context-expanded";
+
+export interface CommentAuthor {
+    kind: "user" | "agent";
+    name?: string;
+}
+
+export interface DiffComment {
+    id: string;
+    filePath: string;
+    side: CommentSide;
+    lineNumber: number;
+    lineType: CommentLineType;
+    lineText: string;
+    body: string;
+    createdAt: number;
+    author?: CommentAuthor;
+    stale?: boolean;
+}
+
+export type CommentMap = Record<string, DiffComment[]>;
+
+export interface CommentSnapshot {
+    revision: number;
+    comments: CommentMap;
+}
+
 export interface RepoInfo {
     id: string;
     repoRoot: string;
