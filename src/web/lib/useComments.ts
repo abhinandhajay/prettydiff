@@ -70,58 +70,100 @@ async function jsonRequest(
 export function useComments(options: Options) {
     const [comments, setComments] = useState<CommentMap>({});
     const [error, setError] = useState<string | null>(null);
+    const [loadedScope, setLoadedScope] = useState<string | null>(null);
     const revisionRef = useRef<number | null>(null);
     const etagRef = useRef<string | null>(null);
     const pendingRef = useRef(new Map<string, PendingComment>());
     const optionsRef = useRef(options);
+    const activeScopeRef = useRef(query(options));
+    const loadSerialRef = useRef(0);
+    const appliedLoadSerialRef = useRef(0);
     optionsRef.current = options;
+    const scope = query(options);
+    if (activeScopeRef.current !== scope) {
+        activeScopeRef.current = scope;
+        revisionRef.current = null;
+        etagRef.current = null;
+        appliedLoadSerialRef.current = 0;
+    }
 
-    const load = useCallback(async (migrate = false) => {
-        const current = optionsRef.current;
-        const headers: HeadersInit = {};
-        if (etagRef.current) headers["if-none-match"] = etagRef.current;
-        const response = await fetch(`/api/comments?${query(current)}`, { headers });
-        if (response.status === 304) return;
-        const body = (await response.json().catch(() => ({}))) as CommentSnapshot & {
-            error?: string;
-        };
-        if (!response.ok) throw new Error(body.error ?? `request failed (${response.status})`);
-        etagRef.current = response.headers.get("etag");
-        revisionRef.current = body.revision;
-        const requestKey = query(current);
-        setComments(mergePending(body.comments, pendingRef.current, requestKey));
-        setError(null);
-
-        if (migrate) {
-            const key = current.repoId
-                ? `prettydiff:${current.repoId}:comments`
-                : "prettydiff:comments";
-            const raw = localStorage.getItem(key);
-            if (raw) {
-                const legacy = JSON.parse(raw) as CommentMap;
-                const imported = await jsonRequest(`/api/comments/import?${query(current)}`, {
-                    method: "POST",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ comments: legacy }),
-                });
-                revisionRef.current = imported.revision;
-                etagRef.current = null;
-                setComments(mergePending(imported.comments, pendingRef.current, requestKey));
-                localStorage.removeItem(key);
+    const applySnapshot = useCallback(
+        (snapshot: CommentSnapshot, requestKey: string, loadSerial?: number, markLoaded = true) => {
+            if (activeScopeRef.current !== requestKey) return false;
+            if (loadSerial !== undefined && loadSerial < appliedLoadSerialRef.current) return false;
+            if (revisionRef.current !== null && snapshot.revision < revisionRef.current) {
+                return false;
             }
-        }
-    }, []);
+            if (loadSerial !== undefined) appliedLoadSerialRef.current = loadSerial;
+            revisionRef.current = snapshot.revision;
+            setComments(mergePending(snapshot.comments, pendingRef.current, requestKey));
+            if (markLoaded) setLoadedScope(requestKey);
+            setError(null);
+            return true;
+        },
+        [],
+    );
+
+    const load = useCallback(
+        async (migrate = false) => {
+            const current = optionsRef.current;
+            const requestKey = query(current);
+            const loadSerial = ++loadSerialRef.current;
+            const headers: HeadersInit = {};
+            if (etagRef.current) headers["if-none-match"] = etagRef.current;
+            try {
+                const response = await fetch(`/api/comments?${requestKey}`, { headers });
+                if (activeScopeRef.current !== requestKey) return;
+                if (response.status === 304) {
+                    if (loadSerial < appliedLoadSerialRef.current) return;
+                    appliedLoadSerialRef.current = loadSerial;
+                    setLoadedScope(requestKey);
+                    setError(null);
+                    return;
+                }
+                const body = (await response.json().catch(() => ({}))) as CommentSnapshot & {
+                    error?: string;
+                };
+                if (!response.ok)
+                    throw new Error(body.error ?? `request failed (${response.status})`);
+                if (!applySnapshot(body, requestKey, loadSerial, !migrate)) return;
+                etagRef.current = response.headers.get("etag");
+
+                if (migrate) {
+                    const key = current.repoId
+                        ? `prettydiff:${current.repoId}:comments`
+                        : "prettydiff:comments";
+                    const raw = localStorage.getItem(key);
+                    if (raw) {
+                        const legacy = JSON.parse(raw) as CommentMap;
+                        const imported = await jsonRequest(`/api/comments/import?${requestKey}`, {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ comments: legacy }),
+                        });
+                        localStorage.removeItem(key);
+                        if (applySnapshot(imported, requestKey)) etagRef.current = null;
+                    } else {
+                        setLoadedScope(requestKey);
+                    }
+                }
+            } catch (cause) {
+                if (activeScopeRef.current === requestKey) setError((cause as Error).message);
+                throw cause;
+            }
+        },
+        [applySnapshot],
+    );
 
     useEffect(() => {
-        etagRef.current = null;
-        revisionRef.current = null;
-        load(true).catch((cause: Error) => setError(cause.message));
+        setLoadedScope(null);
+        load(true).catch(() => {});
         const timer = window.setInterval(() => {
             if (document.visibilityState === "visible") {
-                load().catch((cause: Error) => setError(cause.message));
+                load().catch(() => {});
             }
         }, 2000);
-        const onFocus = () => load().catch((cause: Error) => setError(cause.message));
+        const onFocus = () => load().catch(() => {});
         window.addEventListener("focus", onFocus);
         return () => {
             window.clearInterval(timer);
@@ -129,89 +171,90 @@ export function useComments(options: Options) {
         };
     }, [load, options.repoId, options.target, options.targetRef, options.includeWorkingTree]);
 
-    const create = useCallback((draft: DraftLine, body: string) => {
-        const current = optionsRef.current;
-        const requestKey = query(current);
-        const comment: DiffComment = {
-            id: crypto.randomUUID(),
-            ...draft,
-            body: body.trim(),
-            createdAt: Date.now(),
-            author: { kind: "user" },
-        };
-        pendingRef.current.set(comment.id, { comment, requestKey });
-        setComments((existing) => addComment(existing, comment));
-        setError(null);
+    const create = useCallback(
+        (draft: DraftLine, body: string) => {
+            const current = optionsRef.current;
+            const requestKey = query(current);
+            const comment: DiffComment = {
+                id: crypto.randomUUID(),
+                ...draft,
+                body: body.trim(),
+                createdAt: Date.now(),
+                author: { kind: "user" },
+            };
+            pendingRef.current.set(comment.id, { comment, requestKey });
+            setComments((existing) => addComment(existing, comment));
+            setError(null);
 
-        void jsonRequest(`/api/comments?${requestKey}`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(comment),
-        })
-            .then((response) => {
-                pendingRef.current.delete(comment.id);
-                if (query(optionsRef.current) !== requestKey) return;
-                revisionRef.current = response.revision;
-                etagRef.current = null;
-                setComments(mergePending(response.comments, pendingRef.current, requestKey));
-                setError(null);
+            void jsonRequest(`/api/comments?${requestKey}`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(comment),
             })
-            .catch((cause) => {
-                pendingRef.current.delete(comment.id);
-                if (query(optionsRef.current) !== requestKey) return;
-                setComments((existing) => removeComment(existing, comment.id));
-                setError((cause as Error).message);
-            });
+                .then((response) => {
+                    pendingRef.current.delete(comment.id);
+                    if (applySnapshot(response, requestKey)) etagRef.current = null;
+                })
+                .catch((cause) => {
+                    pendingRef.current.delete(comment.id);
+                    if (query(optionsRef.current) !== requestKey) return;
+                    setComments((existing) => removeComment(existing, comment.id));
+                    setError((cause as Error).message);
+                });
 
-        return Promise.resolve(comment);
-    }, []);
+            return Promise.resolve(comment);
+        },
+        [applySnapshot],
+    );
 
-    const update = useCallback(async (id: string, body: string) => {
-        try {
+    const update = useCallback(
+        async (id: string, body: string) => {
             const current = optionsRef.current;
-            const response = await jsonRequest(
-                `/api/comments/${encodeURIComponent(id)}?${query(current)}`,
-                {
-                    method: "PATCH",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ body }),
-                },
-            );
-            revisionRef.current = response.revision;
-            etagRef.current = null;
-            setComments(response.comments);
-            setError(null);
-        } catch (cause) {
-            setError((cause as Error).message);
-            throw cause;
-        }
-    }, []);
+            const requestKey = query(current);
+            try {
+                const response = await jsonRequest(
+                    `/api/comments/${encodeURIComponent(id)}?${requestKey}`,
+                    {
+                        method: "PATCH",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ body }),
+                    },
+                );
+                if (applySnapshot(response, requestKey)) etagRef.current = null;
+            } catch (cause) {
+                if (activeScopeRef.current === requestKey) setError((cause as Error).message);
+                throw cause;
+            }
+        },
+        [applySnapshot],
+    );
 
-    const remove = useCallback(async (id: string) => {
-        try {
+    const remove = useCallback(
+        async (id: string) => {
             const current = optionsRef.current;
-            const response = await jsonRequest(
-                `/api/comments/${encodeURIComponent(id)}?${query(current)}`,
-                {
-                    method: "DELETE",
-                    headers: { "content-type": "application/json" },
-                    body: "{}",
-                },
-            );
-            revisionRef.current = response.revision;
-            etagRef.current = null;
-            setComments(response.comments);
-            setError(null);
-        } catch (cause) {
-            setError((cause as Error).message);
-            throw cause;
-        }
-    }, []);
+            const requestKey = query(current);
+            try {
+                const response = await jsonRequest(
+                    `/api/comments/${encodeURIComponent(id)}?${requestKey}`,
+                    {
+                        method: "DELETE",
+                        headers: { "content-type": "application/json" },
+                        body: "{}",
+                    },
+                );
+                if (applySnapshot(response, requestKey)) etagRef.current = null;
+            } catch (cause) {
+                if (activeScopeRef.current === requestKey) setError((cause as Error).message);
+                throw cause;
+            }
+        },
+        [applySnapshot],
+    );
 
     const refresh = useCallback(() => {
         etagRef.current = null;
         return load();
     }, [load]);
 
-    return { comments, error, refresh, create, update, remove };
+    return { comments, error, loaded: loadedScope === scope, refresh, create, update, remove };
 }

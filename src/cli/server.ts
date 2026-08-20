@@ -19,12 +19,14 @@ import { createValidatedComment, stampStale } from "./review.js";
 
 import type { HubRegistry } from "./registry.js";
 import type {
+    CommentSnapshot,
     DiffPayload,
     HeartbeatRequest,
     HubIdentity,
     HubReposResponse,
     RegisterRequest,
     RegisterResponse,
+    RepoInfo,
     UnregisterRequest,
 } from "./types.js";
 import type { Socket } from "node:net";
@@ -180,25 +182,28 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
         return { repo, file };
     };
 
+    const reviewSnapshot = async (c: Context, repo: RepoInfo, snapshot: CommentSnapshot) => {
+        const filePaths = Object.keys(snapshot.comments);
+        if (!filePaths.length) return { snapshot, payload: undefined };
+        const payload = await getDiffPayloadForFiles(repo.repoRoot, filePaths, diffOptions(c));
+        if (payload === null) throw new Error("not a git repository");
+        return {
+            snapshot: { ...snapshot, comments: stampStale(snapshot.comments, payload.files) },
+            payload,
+        };
+    };
+
     app.get("/api/comments", async (c) => {
         const repo = registry.resolveRepo(c.req.query("repo"));
         if (!repo) return c.json({ error: "unknown repo" }, 404);
         try {
             const snapshot = await comments.get(repo.id, repo.repoRoot);
-            const filePaths = Object.keys(snapshot.comments);
-            const payload = filePaths.length
-                ? await getDiffPayloadForFiles(repo.repoRoot, filePaths, diffOptions(c))
-                : undefined;
-            if (payload === null) return c.json({ error: "not a git repository" }, 500);
+            const reviewed = await reviewSnapshot(c, repo, snapshot);
+            const { payload } = reviewed;
             const etag = commentEtag(snapshot.revision, payload);
             if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304 });
             c.header("etag", etag);
-            return c.json({
-                ...snapshot,
-                comments: payload
-                    ? stampStale(snapshot.comments, payload.files)
-                    : snapshot.comments,
-            });
+            return c.json(reviewed.snapshot);
         } catch (error) {
             return c.json({ error: (error as Error).message }, 500);
         }
@@ -213,7 +218,8 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
         if (!body?.comments || typeof body.comments !== "object")
             return c.json({ error: "invalid request" }, 400);
         try {
-            return c.json(await comments.import(repo.id, repo.repoRoot, body.comments as never));
+            const snapshot = await comments.import(repo.id, repo.repoRoot, body.comments as never);
+            return c.json((await reviewSnapshot(c, repo, snapshot)).snapshot);
         } catch (error) {
             return c.json({ error: (error as Error).message }, 500);
         }
@@ -249,7 +255,10 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
                 author: { kind: "user" },
             });
             const snapshot = await comments.create(review.repo.id, review.repo.repoRoot, comment);
-            return c.json({ ...snapshot, comment });
+            return c.json({
+                ...(await reviewSnapshot(c, review.repo, snapshot)).snapshot,
+                comment,
+            });
         } catch (error) {
             return c.json({ error: (error as Error).message }, 400);
         }
@@ -264,9 +273,13 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
         if (typeof body?.body !== "string" || !body.body.trim())
             return c.json({ error: "invalid request" }, 400);
         try {
-            return c.json(
-                await comments.update(repo.id, repo.repoRoot, c.req.param("id"), body.body.trim()),
+            const snapshot = await comments.update(
+                repo.id,
+                repo.repoRoot,
+                c.req.param("id"),
+                body.body.trim(),
             );
+            return c.json((await reviewSnapshot(c, repo, snapshot)).snapshot);
         } catch (error) {
             return c.json({ error: (error as Error).message }, 404);
         }
@@ -278,7 +291,8 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
         const repo = registry.resolveRepo(c.req.query("repo"));
         if (!repo) return c.json({ error: "unknown repo" }, 404);
         try {
-            return c.json(await comments.delete(repo.id, repo.repoRoot, c.req.param("id")));
+            const snapshot = await comments.delete(repo.id, repo.repoRoot, c.req.param("id"));
+            return c.json((await reviewSnapshot(c, repo, snapshot)).snapshot);
         } catch (error) {
             return c.json({ error: (error as Error).message }, 404);
         }

@@ -272,6 +272,20 @@ describe("CLI and browser server sharing", () => {
             });
             expect(browserCreate.status).toBe(200);
 
+            await writeRepoFile(sharedRepo, "shared.txt", "later\n");
+            const browserUpdate = await fetch(
+                `${server.url}/api/comments/${encodeURIComponent(cliComment.id)}`,
+                {
+                    method: "PATCH",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ body: "Updated after the line changed" }),
+                },
+            );
+            expect(browserUpdate.status).toBe(200);
+            expect((await browserUpdate.json()).comments["shared.txt"][0]).toEqual(
+                expect.objectContaining({ id: cliComment.id, stale: true }),
+            );
+
             stdout = "";
             await runCommentsCommand(["list"], {
                 cwd: sharedRepo,

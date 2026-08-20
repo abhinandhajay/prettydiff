@@ -13,6 +13,8 @@ export type {
     HubReposResponse,
 } from "../../cli/types";
 
+import type { CommentLineType, CommentSide } from "../../cli/types";
+
 export interface DraftLine {
     filePath: string;
     side: CommentSide;

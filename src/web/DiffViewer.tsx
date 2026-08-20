@@ -186,6 +186,7 @@ export function DiffViewer({
     const {
         comments,
         error: commentError,
+        loaded: commentsLoaded,
         refresh: refreshComments,
         create: createComment,
         update: updateStoredComment,
@@ -208,6 +209,7 @@ export function DiffViewer({
             ? DEFAULT_LEFT_PANEL_WIDTH
             : leftPanelSize;
     const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set());
+    const knownCommentsRef = useRef<{ scope: string; ids: Set<string> } | null>(null);
     const [activeDraft, setActiveDraft] = useState<DraftLine | null>(null);
     const [fileRenderMeta, setFileRenderMeta] = useState<DiffRenderMeta>(EMPTY_RENDER_META);
     const [scrollToCommentId, setScrollToCommentId] = useState<string | null>(null);
@@ -238,6 +240,27 @@ export function DiffViewer({
     useEffect(() => {
         commentsRef.current = comments;
     }, [comments]);
+
+    const commentSelectionScope = `${repoId ?? ""}\0${target}\0${targetRef ?? ""}\0${includeWorkingTree}`;
+    useEffect(() => {
+        if (!commentsLoaded) return;
+        const activeIds = allCommentIds(comments);
+        const allIds = new Set(allCommentIds(comments, true));
+        const known = knownCommentsRef.current;
+        if (!known || known.scope !== commentSelectionScope) {
+            knownCommentsRef.current = { scope: commentSelectionScope, ids: allIds };
+            setSelectedCommentIds(new Set(activeIds));
+            return;
+        }
+        const added = activeIds.filter((id) => !known.ids.has(id));
+        knownCommentsRef.current = { scope: commentSelectionScope, ids: allIds };
+        if (!added.length) return;
+        setSelectedCommentIds((selected) => {
+            const next = new Set(selected);
+            for (const id of added) next.add(id);
+            return next;
+        });
+    }, [commentSelectionScope, comments, commentsLoaded]);
 
     const setReviewPanelOpen = useCallback(
         (open: boolean) => {
@@ -364,7 +387,6 @@ export function DiffViewer({
                         for (const f of p.files) init[f.path] = true;
                         setOpenMap(init);
                         if (p.files[0]) setActivePath(p.files[0].path);
-                        setSelectedCommentIds(new Set(allCommentIds(stamped)));
                     } else {
                         const present = new Set(p.files.map((f) => f.path));
                         setOpenMap((prev) => {
