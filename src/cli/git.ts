@@ -138,6 +138,35 @@ async function getTrackedDiff(
     return normalizeLineEndings(r.stdout);
 }
 
+async function includeRenamePairs(
+    cwd: string,
+    baseRef: string,
+    newRef: string | null,
+    filePaths: string[],
+): Promise<string[]> {
+    const requestedPaths = new Set(filePaths);
+    const r = await run(
+        "git",
+        ["diff", baseRef, ...(newRef ? [newRef] : []), "--name-status", "-z", "--find-renames"],
+        cwd,
+    );
+    const fields = r.stdout.split("\0");
+    for (let index = 0; index < fields.length; ) {
+        const status = fields[index++];
+        if (!status) continue;
+        const oldPath = fields[index++];
+        if (!oldPath) continue;
+        if (!status.startsWith("R") && !status.startsWith("C")) continue;
+        const newPath = fields[index++];
+        if (!newPath) continue;
+        if (requestedPaths.has(oldPath) || requestedPaths.has(newPath)) {
+            requestedPaths.add(oldPath);
+            requestedPaths.add(newPath);
+        }
+    }
+    return [...requestedPaths];
+}
+
 async function getFileAtRef(cwd: string, ref: string, relPath: string): Promise<string | null> {
     try {
         // exit 128 means the path doesn't exist at the ref (e.g. an added file).
@@ -394,11 +423,14 @@ async function buildDiffPayload(
     const newRef = includeWorkingTree ? null : "HEAD";
     const hasPathFilter = filePaths !== undefined;
     const hasPaths = (filePaths?.length ?? 0) > 0;
+    const trackedFilePaths = hasPaths
+        ? await includeRenamePairs(repoRoot, baseRef, newRef, filePaths!)
+        : filePaths;
 
     const [trackedPatch, untrackedList, branches] = await Promise.all([
         hasPathFilter && !hasPaths
             ? Promise.resolve("")
-            : getTrackedDiff(repoRoot, baseRef, newRef, filePaths),
+            : getTrackedDiff(repoRoot, baseRef, newRef, trackedFilePaths),
         includeWorkingTree && (!hasPathFilter || hasPaths)
             ? getUntrackedFiles(repoRoot, filePaths)
             : Promise.resolve([]),

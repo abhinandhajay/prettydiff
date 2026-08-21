@@ -165,6 +165,36 @@ describe("getDiffPayload — working tree", () => {
     );
 
     test(
+        "preserves both sides when filtering renamed review files",
+        async () => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "old.txt", "line1\nline2\nline3\nline4\n");
+            await runGit(repo, "mv", "old.txt", "new.txt");
+            await writeRepoFile(repo, "new.txt", "line1\nchanged\nline3\nline4\n");
+
+            const singleFile = await getDiffFile(repo, "new.txt");
+            const batchedFile = fileByPath(
+                (await getDiffPayloadForFiles(repo, ["new.txt"]))!.files,
+                "new.txt",
+            );
+            for (const file of [singleFile, batchedFile]) {
+                expect(file).toEqual(
+                    expect.objectContaining({
+                        path: "new.txt",
+                        oldPath: "old.txt",
+                        status: "renamed",
+                        oldContents: "line1\nline2\nline3\nline4\n",
+                        newContents: "line1\nchanged\nline3\nline4\n",
+                    }),
+                );
+                expect(file!.rawPatch).toContain("-line2");
+                expect(file!.rawPatch).toContain("+changed");
+            }
+        },
+        TIMEOUT,
+    );
+
+    test(
         "staged new file is added",
         async () => {
             const repo = await trackedRepo();
