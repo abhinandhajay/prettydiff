@@ -164,6 +164,36 @@ describe("useComments", () => {
         expect(result.current.comments["a.ts"]).toBeUndefined();
     });
 
+    test("hides comments while a new scope is loading", async () => {
+        const repoB = deferred<Response>();
+        globalThis.fetch = ((input) =>
+            String(input).includes("repo=repo-b")
+                ? repoB.promise
+                : Promise.resolve(
+                      response({ revision: 1, comments: { "a.ts": [{ id: "a" }] } }),
+                  )) as typeof fetch;
+
+        const { result, rerender } = renderHook(
+            ({ repoId }) =>
+                useComments({
+                    repoId,
+                    target: "working-tree",
+                    targetRef: null,
+                    includeWorkingTree: true,
+                }),
+            { initialProps: { repoId: "repo-a" } },
+        );
+        await waitFor(() => expect(result.current.comments["a.ts"]).toHaveLength(1));
+
+        rerender({ repoId: "repo-b" });
+        expect(result.current.loaded).toBe(false);
+        expect(result.current.comments).toEqual({});
+
+        repoB.resolve(response({ revision: 1, comments: { "b.ts": [{ id: "b" }] } }));
+        await waitFor(() => expect(result.current.comments["b.ts"]).toHaveLength(1));
+        expect(result.current.comments["a.ts"]).toBeUndefined();
+    });
+
     test("keeps the highest revision when mutations finish out of order", async () => {
         const older = deferred<Response>();
         const newer = deferred<Response>();

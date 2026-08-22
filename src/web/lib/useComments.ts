@@ -14,6 +14,8 @@ interface PendingComment {
     requestKey: string;
 }
 
+const EMPTY_COMMENTS: CommentMap = {};
+
 function addComment(comments: CommentMap, comment: DiffComment): CommentMap {
     return {
         ...comments,
@@ -256,5 +258,14 @@ export function useComments(options: Options) {
         return load();
     }, [load]);
 
-    return { comments, error, loaded: loadedScope === scope, refresh, create, update, remove };
+    const loaded = loadedScope === scope;
+    return {
+        comments: loaded ? comments : EMPTY_COMMENTS,
+        error,
+        loaded,
+        refresh,
+        create,
+        update,
+        remove,
+    };
 }
