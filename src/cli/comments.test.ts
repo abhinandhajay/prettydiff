@@ -72,6 +72,10 @@ describe("comments help", () => {
         expect(missing.code).toBe(2);
         expect(missing.stderr).toContain("--side must be additions or deletions");
     });
+
+    test("preserves the shell continuation in the add example", () => {
+        expect(COMMENTS_ADD_HELP).toContain("--line 42 \\\n      --body");
+    });
 });
 
 describe("comments commands", () => {

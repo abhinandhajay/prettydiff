@@ -63,7 +63,7 @@ Output:
   JSON containing the created comment and comment-store revision.
 
 Example:
-  prettydiff comments add --file src/app.ts --side additions --line 42 \
+  prettydiff comments add --file src/app.ts --side additions --line 42 \\
       --body "Handle the rejected promise." --author Codex
 `;
 

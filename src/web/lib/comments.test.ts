@@ -7,6 +7,7 @@ import {
     commentsByKey,
     formatCommentsForCopy,
     markStaleComments,
+    reconcileCommentSelection,
     type PatchLineIndex,
 } from "@/lib/comments";
 
@@ -170,6 +171,31 @@ describe("markStaleComments", () => {
         const comments: CommentMap = { "x.ts": [makeComment({ lineText: "doctored" })] };
         const result = markStaleComments(comments, [modified], new Map([["x.ts", doctored]]));
         expect(result).toBe(comments);
+    });
+});
+
+describe("reconcileCommentSelection", () => {
+    it("keeps manual deselection, selects new comments, and drops removed ids", () => {
+        const before = {
+            "x.ts": [
+                makeComment({ id: "kept" }),
+                makeComment({ id: "deselected" }),
+                makeComment({ id: "removed" }),
+            ],
+        };
+        const after = {
+            "x.ts": [
+                makeComment({ id: "kept" }),
+                makeComment({ id: "deselected" }),
+                makeComment({ id: "new" }),
+            ],
+        };
+        const result = reconcileCommentSelection(
+            new Set(["kept", "removed"]),
+            new Set(allCommentIds(before, true)),
+            after,
+        );
+        expect([...result]).toEqual(["kept", "new"]);
     });
 });
 

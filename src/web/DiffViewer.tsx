@@ -8,7 +8,13 @@ import {
     type ReviewSidebarTab,
 } from "@/components/ReviewSidebar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { allCommentIds, buildFileIndex, commentKey, formatCommentsForCopy } from "@/lib/comments";
+import {
+    allCommentIds,
+    buildFileIndex,
+    commentKey,
+    formatCommentsForCopy,
+    reconcileCommentSelection,
+} from "@/lib/comments";
 import { fetchDiff, FetchDiffError } from "@/lib/fetchDiff";
 import { fileCardId } from "@/lib/slug";
 import { sortFilesForTree } from "@/lib/treeSort";
@@ -252,14 +258,10 @@ export function DiffViewer({
             setSelectedCommentIds(new Set(activeIds));
             return;
         }
-        const added = activeIds.filter((id) => !known.ids.has(id));
         knownCommentsRef.current = { scope: commentSelectionScope, ids: allIds };
-        if (!added.length) return;
-        setSelectedCommentIds((selected) => {
-            const next = new Set(selected);
-            for (const id of added) next.add(id);
-            return next;
-        });
+        setSelectedCommentIds((selected) =>
+            reconcileCommentSelection(selected, known.ids, comments),
+        );
     }, [commentSelectionScope, comments, commentsLoaded]);
 
     const setReviewPanelOpen = useCallback(
@@ -369,7 +371,6 @@ export function DiffViewer({
                             if (loadId !== loadIdRef.current) return;
                         }
                     }
-                    const stamped = commentsRef.current;
                     if (loadId !== loadIdRef.current) return;
                     setPayload(p);
                     refreshComments().catch(() => {});
@@ -399,17 +400,6 @@ export function DiffViewer({
                         setActivePath((prev) =>
                             prev && present.has(prev) ? prev : (p.files[0]?.path ?? null),
                         );
-                        setSelectedCommentIds((prev) => {
-                            const validIds = new Set(allCommentIds(stamped, true));
-                            const next = new Set<string>();
-                            for (const id of prev) {
-                                if (validIds.has(id)) next.add(id);
-                            }
-                            for (const id of allCommentIds(stamped)) {
-                                next.add(id);
-                            }
-                            return next;
-                        });
                     }
                     if (mode === "initial") setInitialLoadPending(false);
                 })

@@ -31,12 +31,20 @@ function isComment(value: unknown): value is DiffComment {
         typeof c.filePath === "string" &&
         (c.side === "additions" || c.side === "deletions") &&
         typeof c.lineNumber === "number" &&
-        typeof c.lineType === "string" &&
+        Number.isInteger(c.lineNumber) &&
+        c.lineNumber > 0 &&
+        (c.lineType === "change-addition" ||
+            c.lineType === "change-deletion" ||
+            c.lineType === "context" ||
+            c.lineType === "context-expanded") &&
         typeof c.lineText === "string" &&
         typeof c.body === "string" &&
         typeof c.createdAt === "number" &&
+        Number.isFinite(c.createdAt) &&
         c.author &&
-        (c.author.kind === "user" || c.author.kind === "agent"),
+        (c.author.kind === "user" || c.author.kind === "agent") &&
+        (c.author.name === undefined || typeof c.author.name === "string") &&
+        (c.stale === undefined || typeof c.stale === "boolean"),
     );
 }
 
@@ -165,6 +173,7 @@ export class CommentStore {
 
     create(repoId: string, repoRoot: string, comment: DiffComment): Promise<CommentSnapshot> {
         return this.mutate(repoId, repoRoot, (review) => {
+            if (!isComment(comment)) throw new Error("invalid comment");
             if (
                 Object.values(review.comments)
                     .flat()

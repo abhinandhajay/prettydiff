@@ -46,6 +46,13 @@ describe("CommentStore", () => {
         expect(saved.comments["a.txt"]?.[0]?.author).toEqual({ kind: "user" });
     });
 
+    test("ignores imported comments with unsupported line types", async () => {
+        const store = new CommentStore(await makeTmpDir());
+        const malformed = { ...comment("malformed"), lineType: "unexpected" };
+        await store.import(repoId, repoRoot, { "a.txt": [malformed] } as never);
+        expect((await store.get(repoId, repoRoot)).comments).toEqual({});
+    });
+
     test("serializes concurrent mutations without losing comments", async () => {
         const dir = await makeTmpDir();
         const a = new CommentStore(dir);
@@ -57,6 +64,14 @@ describe("CommentStore", () => {
         expect(Object.values((await a.get(repoId, repoRoot)).comments).flat()).toHaveLength(2);
     });
 
+    test("rejects malformed comments before persistence", async () => {
+        const store = new CommentStore(await makeTmpDir());
+        await expect(
+            store.create(repoId, repoRoot, { ...comment("malformed"), id: 42 } as never),
+        ).rejects.toThrow("invalid comment");
+        expect((await store.get(repoId, repoRoot)).comments).toEqual({});
+    });
+
     test("refuses corrupt persisted data", async () => {
         const dir = await makeTmpDir();
         const reviews = path.join(dir, "reviews");
@@ -66,5 +81,23 @@ describe("CommentStore", () => {
             "cannot read stored comments",
         );
         expect(await readFile(path.join(reviews, `${repoId}.json`), "utf8")).toBe("not json");
+    });
+
+    test("refuses persisted comments with unsupported line types", async () => {
+        const dir = await makeTmpDir();
+        const reviews = path.join(dir, "reviews");
+        await mkdir(reviews, { recursive: true });
+        await writeFile(
+            path.join(reviews, `${repoId}.json`),
+            JSON.stringify({
+                schemaVersion: 1,
+                repoRoot,
+                revision: 1,
+                comments: { "a.txt": [{ ...comment("malformed"), lineType: "unexpected" }] },
+            }),
+        );
+        await expect(new CommentStore(dir).get(repoId, repoRoot)).rejects.toThrow(
+            "cannot read stored comments",
+        );
     });
 });

@@ -186,6 +186,20 @@ export function allCommentIds(comments: CommentMap, includeStale = false): strin
     return ids;
 }
 
+export function reconcileCommentSelection(
+    selectedIds: Set<string>,
+    knownIds: Set<string>,
+    comments: CommentMap,
+): Set<string> {
+    const activeIds = allCommentIds(comments);
+    const currentIds = new Set(allCommentIds(comments, true));
+    const next = new Set([...selectedIds].filter((id) => currentIds.has(id)));
+    for (const id of activeIds) {
+        if (!knownIds.has(id)) next.add(id);
+    }
+    return next;
+}
+
 const EXT_TO_LANG: Record<string, string> = {
     ts: "ts",
     tsx: "tsx",

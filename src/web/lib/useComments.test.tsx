@@ -58,6 +58,53 @@ describe("useComments", () => {
         expect(localStorage.getItem("prettydiff:repo-1:comments")).toBeNull();
     });
 
+    test("discards malformed legacy storage without hiding server comments", async () => {
+        localStorage.setItem("prettydiff:repo-1:comments", "not json");
+        globalThis.fetch = (async () =>
+            response({
+                revision: 1,
+                comments: { "a.ts": [{ id: "server" }] },
+            })) as unknown as typeof fetch;
+
+        const { result } = renderHook(() =>
+            useComments({
+                repoId: "repo-1",
+                target: "working-tree",
+                targetRef: null,
+                includeWorkingTree: true,
+            }),
+        );
+
+        await waitFor(() => expect(result.current.loaded).toBe(true));
+        expect(result.current.comments["a.ts"]?.[0]?.id).toBe("server");
+        expect(localStorage.getItem("prettydiff:repo-1:comments")).toBeNull();
+    });
+
+    test("keeps server comments visible when legacy import fails", async () => {
+        localStorage.setItem("prettydiff:repo-1:comments", JSON.stringify({ "a.ts": [] }));
+        globalThis.fetch = (async (input: RequestInfo | URL) =>
+            String(input).includes("/import")
+                ? response({ error: "import failed" }, { status: 500 })
+                : response({
+                      revision: 1,
+                      comments: { "a.ts": [{ id: "server" }] },
+                  })) as unknown as typeof fetch;
+
+        const { result } = renderHook(() =>
+            useComments({
+                repoId: "repo-1",
+                target: "working-tree",
+                targetRef: null,
+                includeWorkingTree: true,
+            }),
+        );
+
+        await waitFor(() => expect(result.current.error).toBe("import failed"));
+        expect(result.current.loaded).toBe(true);
+        expect(result.current.comments["a.ts"]?.[0]?.id).toBe("server");
+        expect(localStorage.getItem("prettydiff:repo-1:comments")).not.toBeNull();
+    });
+
     test("shows a created comment before persistence completes", async () => {
         let resolveCreate!: (value: Response) => void;
         let postedComment: Record<string, unknown> | undefined;

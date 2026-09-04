@@ -137,12 +137,25 @@ export function useComments(options: Options) {
                         : "prettydiff:comments";
                     const raw = localStorage.getItem(key);
                     if (raw) {
-                        const legacy = JSON.parse(raw) as CommentMap;
-                        const imported = await jsonRequest(`/api/comments/import?${requestKey}`, {
-                            method: "POST",
-                            headers: { "content-type": "application/json" },
-                            body: JSON.stringify({ comments: legacy }),
-                        });
+                        let legacy: CommentMap;
+                        try {
+                            legacy = JSON.parse(raw) as CommentMap;
+                        } catch {
+                            localStorage.removeItem(key);
+                            setLoadedScope(requestKey);
+                            return;
+                        }
+                        let imported: CommentSnapshot;
+                        try {
+                            imported = await jsonRequest(`/api/comments/import?${requestKey}`, {
+                                method: "POST",
+                                headers: { "content-type": "application/json" },
+                                body: JSON.stringify({ comments: legacy }),
+                            });
+                        } catch (cause) {
+                            setLoadedScope(requestKey);
+                            throw cause;
+                        }
                         localStorage.removeItem(key);
                         if (applySnapshot(imported, requestKey)) etagRef.current = null;
                     } else {
