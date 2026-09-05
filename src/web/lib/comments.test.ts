@@ -7,9 +7,7 @@ import {
     commentsForPath,
     commentsByKey,
     formatCommentsForCopy,
-    markStaleComments,
     reconcileCommentSelection,
-    type PatchLineIndex,
 } from "@/lib/comments";
 
 import type { CommentMap, DiffComment, ParsedFile } from "@/lib/types";
@@ -136,55 +134,6 @@ describe("allCommentIds", () => {
 
     it("includes stale comments when asked", () => {
         expect(allCommentIds(comments, true).sort()).toEqual(["c1", "c2", "c3"]);
-    });
-});
-
-describe("markStaleComments", () => {
-    it("returns the same reference when nothing changed", () => {
-        const comments: CommentMap = { "x.ts": [makeComment()] };
-        const result = markStaleComments(comments, [modified]);
-        expect(result).toBe(comments);
-        expect(result["x.ts"]).toBe(comments["x.ts"]);
-    });
-
-    it("marks comments stale when their file disappears", () => {
-        const comments: CommentMap = { "gone.ts": [makeComment({ filePath: "gone.ts" })] };
-        const result = markStaleComments(comments, [modified]);
-        expect(result).not.toBe(comments);
-        expect(result["gone.ts"]![0]!.stale).toBe(true);
-    });
-
-    it("keeps identity when a missing file's comments are already stale", () => {
-        const comments: CommentMap = {
-            "gone.ts": [makeComment({ filePath: "gone.ts", stale: true })],
-        };
-        expect(markStaleComments(comments, [])).toBe(comments);
-    });
-
-    it("marks comments stale when the line text drifts", () => {
-        const comments: CommentMap = { "x.ts": [makeComment({ lineText: "old text" })] };
-        const result = markStaleComments(comments, [modified]);
-        expect(result["x.ts"]![0]!.stale).toBe(true);
-    });
-
-    it("revives stale comments whose line text matches again", () => {
-        const comments: CommentMap = { "x.ts": [makeComment({ stale: true })] };
-        const result = markStaleComments(comments, [modified]);
-        expect(result["x.ts"]![0]!.stale).toBe(false);
-    });
-
-    it("prefers a supplied index over rebuilding", () => {
-        const doctored: PatchLineIndex = {
-            additions: new Map([[2, "doctored"]]),
-            deletions: new Map(),
-            changedAdditions: new Set(),
-            changedDeletions: new Set(),
-            patchAdditions: new Set(),
-            patchDeletions: new Set(),
-        };
-        const comments: CommentMap = { "x.ts": [makeComment({ lineText: "doctored" })] };
-        const result = markStaleComments(comments, [modified], new Map([["x.ts", doctored]]));
-        expect(result).toBe(comments);
     });
 });
 

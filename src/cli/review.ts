@@ -77,22 +77,19 @@ export function lineInfo(file: ParsedFile, side: CommentSide, lineNumber: number
 
 export function stampStale(comments: CommentMap, files: ParsedFile[]): CommentMap {
     const byPath = new Map(files.map((file) => [file.path, file]));
-    const result: CommentMap = {};
-    for (const [filePath, list] of Object.entries(comments)) {
-        const file = byPath.get(filePath);
-        const stamped = list.map((comment) => {
-            const info = file ? lineInfo(file, comment.side, comment.lineNumber) : null;
-            const stale = !info || info.text !== comment.lineText;
-            return stale === Boolean(comment.stale) ? comment : { ...comment, stale };
-        });
-        Object.defineProperty(result, filePath, {
-            value: stamped,
-            enumerable: true,
-            configurable: true,
-            writable: true,
-        });
-    }
-    return result;
+    return Object.fromEntries(
+        Object.entries(comments).map(([filePath, list]) => {
+            const file = byPath.get(filePath);
+            return [
+                filePath,
+                list.map((comment) => {
+                    const info = file ? lineInfo(file, comment.side, comment.lineNumber) : null;
+                    const stale = !info || info.text !== comment.lineText;
+                    return stale === Boolean(comment.stale) ? comment : { ...comment, stale };
+                }),
+            ];
+        }),
+    );
 }
 
 export function createValidatedComment(

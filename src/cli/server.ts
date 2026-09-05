@@ -335,18 +335,11 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
                             clearInterval(prune);
                             for (const socket of sockets) socket.destroy();
                             await new Promise<void>((res) => {
-                                let settled = false;
-                                const finish = () => {
-                                    if (settled) return;
-                                    settled = true;
-                                    res();
-                                };
-                                clearInterval(prune);
-                                server.close(finish);
+                                server.close(() => res());
                                 if ("closeAllConnections" in server) {
                                     server.closeAllConnections();
                                 }
-                                setTimeout(finish, 250);
+                                setTimeout(res, 250).unref();
                             });
                         },
                     });

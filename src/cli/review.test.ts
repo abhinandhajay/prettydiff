@@ -50,6 +50,31 @@ describe("lineInfo", () => {
 });
 
 describe("stampStale", () => {
+    test("marks missing files, missing lines, and changed text stale, and revives matching lines", () => {
+        const comment = {
+            id: "c1",
+            filePath: file.path,
+            side: "additions" as const,
+            lineNumber: 3,
+            lineType: "change-addition" as const,
+            lineText: "changed",
+            body: "Review this",
+            createdAt: 1,
+            author: { kind: "agent" as const },
+        };
+        const comments = { [file.path]: [comment] };
+        expect(stampStale(comments, [file])[file.path][0]).toBe(comment);
+        expect(stampStale(comments, [])[file.path][0].stale).toBe(true);
+        expect(
+            stampStale(comments, [{ ...file, newContents: "outside\n" }])[file.path][0].stale,
+        ).toBe(true);
+        expect(
+            stampStale(comments, [{ ...file, newContents: file.oldContents }])[file.path][0].stale,
+        ).toBe(true);
+        const stale = stampStale(comments, []);
+        expect(stampStale(stale, [file])[file.path][0].stale).toBe(false);
+    });
+
     test("preserves comment buckets for reserved object property names", () => {
         const specialFile = { ...file, path: "__proto__" };
         const comment = {

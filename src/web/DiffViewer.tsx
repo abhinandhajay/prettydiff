@@ -81,15 +81,6 @@ function ownValue<T>(record: Record<string, T>, key: string): T | undefined {
     return Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
-function setOwnValue<T>(record: Record<string, T>, key: string, value: T): void {
-    Object.defineProperty(record, key, {
-        value,
-        enumerable: true,
-        configurable: true,
-        writable: true,
-    });
-}
-
 function buildRenderMeta(files: ParsedFile[]): DiffRenderMeta {
     const byPath = new Map<string, DiffFileRenderMeta>();
     let totalLines = 0;
@@ -397,19 +388,15 @@ export function DiffViewer({
                         );
                     }
                     if (mode === "initial") {
-                        const init: Record<string, boolean> = {};
-                        for (const f of p.files) setOwnValue(init, f.path, true);
-                        setOpenMap(init);
+                        setOpenMap(Object.fromEntries(p.files.map((f) => [f.path, true])));
                         if (p.files[0]) setActivePath(p.files[0].path);
                     } else {
                         const present = new Set(p.files.map((f) => f.path));
-                        setOpenMap((prev) => {
-                            const next: Record<string, boolean> = {};
-                            for (const f of p.files) {
-                                setOwnValue(next, f.path, ownValue(prev, f.path) ?? true);
-                            }
-                            return next;
-                        });
+                        setOpenMap((prev) =>
+                            Object.fromEntries(
+                                p.files.map((f) => [f.path, ownValue(prev, f.path) ?? true]),
+                            ),
+                        );
                         setActivePath((prev) =>
                             prev && present.has(prev) ? prev : (p.files[0]?.path ?? null),
                         );
@@ -454,16 +441,12 @@ export function DiffViewer({
 
     const expandAll = useCallback(() => {
         if (!payload) return;
-        const m: Record<string, boolean> = {};
-        for (const f of payload.files) setOwnValue(m, f.path, true);
-        setOpenMap(m);
+        setOpenMap(Object.fromEntries(payload.files.map((f) => [f.path, true])));
     }, [payload]);
 
     const collapseAll = useCallback(() => {
         if (!payload) return;
-        const m: Record<string, boolean> = {};
-        for (const f of payload.files) setOwnValue(m, f.path, false);
-        setOpenMap(m);
+        setOpenMap(Object.fromEntries(payload.files.map((f) => [f.path, false])));
     }, [payload]);
 
     const fileScrollCancelRef = useRef<(() => void) | null>(null);
@@ -561,14 +544,11 @@ export function DiffViewer({
             if (!activeDraft) return;
             const trimmed = body.trim();
             if (!trimmed) return;
-            createComment(activeDraft, trimmed)
-                .then((comment) => {
-                    setSelectedCommentIds((selected) => new Set(selected).add(comment.id));
-                    setActiveDraft(null);
-                    setReviewPanelOpen(true);
-                    setLeftPanelTab("comments");
-                })
-                .catch(() => {});
+            const comment = createComment(activeDraft, trimmed);
+            setSelectedCommentIds((selected) => new Set(selected).add(comment.id));
+            setActiveDraft(null);
+            setReviewPanelOpen(true);
+            setLeftPanelTab("comments");
         },
         [activeDraft, createComment, setLeftPanelTab, setReviewPanelOpen],
     );

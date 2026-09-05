@@ -25,19 +25,14 @@ function addComment(comments: CommentMap, comment: DiffComment): CommentMap {
 }
 
 function removeComment(comments: CommentMap, id: string): CommentMap {
-    const result: CommentMap = {};
-    for (const [filePath, list] of Object.entries(comments)) {
-        const remaining = list.filter((comment) => comment.id !== id);
-        if (remaining.length) {
-            Object.defineProperty(result, filePath, {
-                value: remaining,
-                enumerable: true,
-                configurable: true,
-                writable: true,
-            });
-        }
-    }
-    return result;
+    return Object.fromEntries(
+        Object.entries(comments)
+            .map(
+                ([filePath, list]) =>
+                    [filePath, list.filter((comment) => comment.id !== id)] as const,
+            )
+            .filter(([, list]) => list.length),
+    );
 }
 
 function mergePending(
@@ -115,73 +110,69 @@ export function useComments(options: Options) {
         [],
     );
 
-    const load = useCallback(
-        async (retryMigration = true) => {
-            const current = optionsRef.current;
-            const requestKey = query(current);
-            const legacyKey = current.repoId
-                ? `prettydiff:${current.repoId}:comments`
-                : "prettydiff:comments";
-            const migrate = retryMigration && !migratedLegacyKeysRef.current.has(legacyKey);
-            const loadSerial = ++loadSerialRef.current;
-            const headers: HeadersInit = {};
-            if (!migrate && etagRef.current) headers["if-none-match"] = etagRef.current;
-            try {
-                const response = await fetch(`/api/comments?${requestKey}`, { headers });
-                if (activeScopeRef.current !== requestKey) return;
-                if (response.status === 304) {
-                    if (loadSerial < appliedLoadSerialRef.current) return;
-                    appliedLoadSerialRef.current = loadSerial;
-                    setLoadedScope(requestKey);
-                    setError(null);
-                    return;
-                }
-                const body = (await response.json().catch(() => ({}))) as CommentSnapshot & {
-                    error?: string;
-                };
-                if (!response.ok)
-                    throw new Error(body.error ?? `request failed (${response.status})`);
-                if (!applySnapshot(body, requestKey, loadSerial, !migrate)) return;
-                etagRef.current = response.headers.get("etag");
+    const load = useCallback(async () => {
+        const current = optionsRef.current;
+        const requestKey = query(current);
+        const legacyKey = current.repoId
+            ? `prettydiff:${current.repoId}:comments`
+            : "prettydiff:comments";
+        const migrate = !migratedLegacyKeysRef.current.has(legacyKey);
+        const loadSerial = ++loadSerialRef.current;
+        const headers: HeadersInit = {};
+        if (!migrate && etagRef.current) headers["if-none-match"] = etagRef.current;
+        try {
+            const response = await fetch(`/api/comments?${requestKey}`, { headers });
+            if (activeScopeRef.current !== requestKey) return;
+            if (response.status === 304) {
+                if (loadSerial < appliedLoadSerialRef.current) return;
+                appliedLoadSerialRef.current = loadSerial;
+                setLoadedScope(requestKey);
+                setError(null);
+                return;
+            }
+            const body = (await response.json().catch(() => ({}))) as CommentSnapshot & {
+                error?: string;
+            };
+            if (!response.ok) throw new Error(body.error ?? `request failed (${response.status})`);
+            if (!applySnapshot(body, requestKey, loadSerial, !migrate)) return;
+            etagRef.current = response.headers.get("etag");
 
-                if (migrate) {
-                    const raw = localStorage.getItem(legacyKey);
-                    if (raw) {
-                        let legacy: CommentMap;
-                        try {
-                            legacy = JSON.parse(raw) as CommentMap;
-                        } catch {
-                            localStorage.removeItem(legacyKey);
-                            migratedLegacyKeysRef.current.add(legacyKey);
-                            setLoadedScope(requestKey);
-                            return;
-                        }
-                        let imported: CommentSnapshot;
-                        try {
-                            imported = await jsonRequest(`/api/comments/import?${requestKey}`, {
-                                method: "POST",
-                                headers: { "content-type": "application/json" },
-                                body: JSON.stringify({ comments: legacy }),
-                            });
-                        } catch (cause) {
-                            setLoadedScope(requestKey);
-                            throw cause;
-                        }
+            if (migrate) {
+                const raw = localStorage.getItem(legacyKey);
+                if (raw) {
+                    let legacy: CommentMap;
+                    try {
+                        legacy = JSON.parse(raw) as CommentMap;
+                    } catch {
                         localStorage.removeItem(legacyKey);
                         migratedLegacyKeysRef.current.add(legacyKey);
-                        if (applySnapshot(imported, requestKey)) etagRef.current = null;
-                    } else {
-                        migratedLegacyKeysRef.current.add(legacyKey);
                         setLoadedScope(requestKey);
+                        return;
                     }
+                    let imported: CommentSnapshot;
+                    try {
+                        imported = await jsonRequest(`/api/comments/import?${requestKey}`, {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ comments: legacy }),
+                        });
+                    } catch (cause) {
+                        setLoadedScope(requestKey);
+                        throw cause;
+                    }
+                    localStorage.removeItem(legacyKey);
+                    migratedLegacyKeysRef.current.add(legacyKey);
+                    if (applySnapshot(imported, requestKey)) etagRef.current = null;
+                } else {
+                    migratedLegacyKeysRef.current.add(legacyKey);
+                    setLoadedScope(requestKey);
                 }
-            } catch (cause) {
-                if (activeScopeRef.current === requestKey) setError((cause as Error).message);
-                throw cause;
             }
-        },
-        [applySnapshot],
-    );
+        } catch (cause) {
+            if (activeScopeRef.current === requestKey) setError((cause as Error).message);
+            throw cause;
+        }
+    }, [applySnapshot]);
 
     useEffect(() => {
         setLoadedScope(null);
@@ -230,22 +221,25 @@ export function useComments(options: Options) {
                     setError((cause as Error).message);
                 });
 
-            return Promise.resolve(comment);
+            return comment;
         },
         [applySnapshot],
     );
 
-    const update = useCallback(
-        async (id: string, body: string) => {
-            const current = optionsRef.current;
-            const requestKey = query(current);
+    const mutate = useCallback(
+        async (id: string, method: "PATCH" | "DELETE", body?: string) => {
+            const requestKey = query(optionsRef.current);
             try {
                 const response = await jsonRequest(
                     `/api/comments/${encodeURIComponent(id)}?${requestKey}`,
                     {
-                        method: "PATCH",
+                        method,
                         headers: { "content-type": "application/json" },
-                        body: JSON.stringify({ body }),
+                        ...(method === "PATCH"
+                            ? {
+                                  body: JSON.stringify({ body }),
+                              }
+                            : {}),
                     },
                 );
                 if (applySnapshot(response, requestKey)) etagRef.current = null;
@@ -257,27 +251,8 @@ export function useComments(options: Options) {
         [applySnapshot],
     );
 
-    const remove = useCallback(
-        async (id: string) => {
-            const current = optionsRef.current;
-            const requestKey = query(current);
-            try {
-                const response = await jsonRequest(
-                    `/api/comments/${encodeURIComponent(id)}?${requestKey}`,
-                    {
-                        method: "DELETE",
-                        headers: { "content-type": "application/json" },
-                        body: "{}",
-                    },
-                );
-                if (applySnapshot(response, requestKey)) etagRef.current = null;
-            } catch (cause) {
-                if (activeScopeRef.current === requestKey) setError((cause as Error).message);
-                throw cause;
-            }
-        },
-        [applySnapshot],
-    );
+    const update = useCallback((id: string, body: string) => mutate(id, "PATCH", body), [mutate]);
+    const remove = useCallback((id: string) => mutate(id, "DELETE"), [mutate]);
 
     const refresh = useCallback(() => {
         etagRef.current = null;

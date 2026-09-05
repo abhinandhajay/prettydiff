@@ -26,6 +26,26 @@ afterEach(() => {
 });
 
 describe("useComments", () => {
+    test("deletes a comment without a request body and applies the returned snapshot", async () => {
+        const requests: RequestInit[] = [];
+        globalThis.fetch = (async (_input, init) => {
+            if (init?.method === "DELETE") {
+                requests.push(init);
+                return response({ revision: 2, comments: {} });
+            }
+            return response({ revision: 1, comments: { "a.ts": [{ id: "c" }] } });
+        }) as typeof fetch;
+        const { result } = renderHook(() =>
+            useComments({ target: "working-tree", targetRef: null, includeWorkingTree: true }),
+        );
+        await waitFor(() => expect(result.current.comments["a.ts"]).toHaveLength(1));
+        await act(async () => await result.current.remove("c"));
+        expect(result.current.comments).toEqual({});
+        expect(requests).toHaveLength(1);
+        expect(requests[0].body).toBeUndefined();
+        expect(new Headers(requests[0].headers).get("content-type")).toBe("application/json");
+    });
+
     test("loads shared comments and imports legacy localStorage once", async () => {
         localStorage.setItem(
             "prettydiff:repo-1:comments",

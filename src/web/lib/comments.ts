@@ -124,7 +124,7 @@ function splitFileLines(contents: string): string[] {
  * mark which lines are genuine changes vs context (and which context lines were inside the original
  * hunks).
  */
-function buildContentsIndex(file: ParsedFile): PatchLineIndex {
+export function buildFileIndex(file: ParsedFile): PatchLineIndex {
     const scan = scanPatch(file.rawPatch);
     const additions = new Map<number, string>();
     const deletions = new Map<number, string>();
@@ -140,57 +140,6 @@ function buildContentsIndex(file: ParsedFile): PatchLineIndex {
         patchAdditions: new Set(scan.additions.keys()),
         patchDeletions: new Set(scan.deletions.keys()),
     };
-}
-
-export function buildFileIndex(file: ParsedFile): PatchLineIndex {
-    return buildContentsIndex(file);
-}
-
-export function markStaleComments(
-    comments: CommentMap,
-    files: ParsedFile[],
-    indexByPath?: Map<string, PatchLineIndex>,
-): CommentMap {
-    const byPath = new Map(files.map((f) => [f.path, f] as const));
-    const next: CommentMap = {};
-    let changed = false;
-    for (const [path, list] of Object.entries(comments)) {
-        const file = byPath.get(path);
-        if (!file) {
-            let listChanged = false;
-            const updated = list.map((c) => {
-                if (c.stale) return c;
-                listChanged = true;
-                return { ...c, stale: true };
-            });
-            if (listChanged) changed = true;
-            Object.defineProperty(next, path, {
-                value: listChanged ? updated : list,
-                enumerable: true,
-                configurable: true,
-                writable: true,
-            });
-            continue;
-        }
-        const idx = indexByPath?.get(path) ?? buildFileIndex(file);
-        let listChanged = false;
-        const updated = list.map((c) => {
-            const map = c.side === "additions" ? idx.additions : idx.deletions;
-            const current = map.get(c.lineNumber);
-            const stale = current === undefined || current !== c.lineText;
-            if (stale === Boolean(c.stale)) return c;
-            listChanged = true;
-            return { ...c, stale };
-        });
-        if (listChanged) changed = true;
-        Object.defineProperty(next, path, {
-            value: listChanged ? updated : list,
-            enumerable: true,
-            configurable: true,
-            writable: true,
-        });
-    }
-    return changed ? next : comments;
 }
 
 export function allCommentIds(comments: CommentMap, includeStale = false): string[] {
