@@ -82,13 +82,25 @@ describe("useComments", () => {
 
     test("keeps server comments visible when legacy import fails", async () => {
         localStorage.setItem("prettydiff:repo-1:comments", JSON.stringify({ "a.ts": [] }));
-        globalThis.fetch = (async (input: RequestInfo | URL) =>
-            String(input).includes("/import")
-                ? response({ error: "import failed" }, { status: 500 })
-                : response({
-                      revision: 1,
-                      comments: { "a.ts": [{ id: "server" }] },
-                  })) as unknown as typeof fetch;
+        let importCalls = 0;
+        globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+            if (String(input).includes("/import")) {
+                importCalls += 1;
+                return importCalls === 1
+                    ? response({ error: "import failed" }, { status: 500 })
+                    : response({ revision: 2, comments: { "a.ts": [{ id: "legacy" }] } });
+            }
+            if (new Headers(init?.headers).has("if-none-match")) {
+                return new Response(null, { status: 304 });
+            }
+            return response(
+                {
+                    revision: 1,
+                    comments: { "a.ts": [{ id: "server" }] },
+                },
+                { headers: { "content-type": "application/json", etag: '"1"' } },
+            );
+        }) as unknown as typeof fetch;
 
         const { result } = renderHook(() =>
             useComments({
@@ -103,6 +115,50 @@ describe("useComments", () => {
         expect(result.current.loaded).toBe(true);
         expect(result.current.comments["a.ts"]?.[0]?.id).toBe("server");
         expect(localStorage.getItem("prettydiff:repo-1:comments")).not.toBeNull();
+
+        await act(async () => await result.current.refresh());
+        expect(result.current.comments["a.ts"]?.[0]?.id).toBe("legacy");
+        expect(localStorage.getItem("prettydiff:repo-1:comments")).toBeNull();
+        expect(importCalls).toBe(2);
+    });
+
+    test("retries legacy migration after the initial comments request fails", async () => {
+        localStorage.setItem(
+            "prettydiff:repo-1:comments",
+            JSON.stringify({ "a.ts": [{ id: "legacy" }] }),
+        );
+        let getCalls = 0;
+        let importCalls = 0;
+        globalThis.fetch = (async (input: RequestInfo | URL) => {
+            if (String(input).includes("/import")) {
+                importCalls += 1;
+                return response({ revision: 2, comments: { "a.ts": [{ id: "legacy" }] } });
+            }
+            getCalls += 1;
+            return getCalls === 1
+                ? response({ error: "temporarily unavailable" }, { status: 503 })
+                : response(
+                      { revision: 1, comments: {} },
+                      { headers: { "content-type": "application/json", etag: '"1"' } },
+                  );
+        }) as unknown as typeof fetch;
+
+        const { result } = renderHook(() =>
+            useComments({
+                repoId: "repo-1",
+                target: "working-tree",
+                targetRef: null,
+                includeWorkingTree: true,
+            }),
+        );
+
+        await waitFor(() => expect(result.current.error).toBe("temporarily unavailable"));
+        expect(result.current.loaded).toBe(false);
+
+        await act(async () => await result.current.refresh());
+        expect(result.current.comments["a.ts"]?.[0]?.id).toBe("legacy");
+        expect(localStorage.getItem("prettydiff:repo-1:comments")).toBeNull();
+        expect(importCalls).toBe(1);
     });
 
     test("shows a created comment before persistence completes", async () => {

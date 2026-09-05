@@ -84,6 +84,7 @@ export function useComments(options: Options) {
     const revisionRef = useRef<number | null>(null);
     const etagRef = useRef<string | null>(null);
     const pendingRef = useRef(new Map<string, PendingComment>());
+    const migratedLegacyKeysRef = useRef(new Set<string>());
     const optionsRef = useRef(options);
     const activeScopeRef = useRef(query(options));
     const loadSerialRef = useRef(0);
@@ -115,12 +116,16 @@ export function useComments(options: Options) {
     );
 
     const load = useCallback(
-        async (migrate = false) => {
+        async (retryMigration = true) => {
             const current = optionsRef.current;
             const requestKey = query(current);
+            const legacyKey = current.repoId
+                ? `prettydiff:${current.repoId}:comments`
+                : "prettydiff:comments";
+            const migrate = retryMigration && !migratedLegacyKeysRef.current.has(legacyKey);
             const loadSerial = ++loadSerialRef.current;
             const headers: HeadersInit = {};
-            if (etagRef.current) headers["if-none-match"] = etagRef.current;
+            if (!migrate && etagRef.current) headers["if-none-match"] = etagRef.current;
             try {
                 const response = await fetch(`/api/comments?${requestKey}`, { headers });
                 if (activeScopeRef.current !== requestKey) return;
@@ -140,16 +145,14 @@ export function useComments(options: Options) {
                 etagRef.current = response.headers.get("etag");
 
                 if (migrate) {
-                    const key = current.repoId
-                        ? `prettydiff:${current.repoId}:comments`
-                        : "prettydiff:comments";
-                    const raw = localStorage.getItem(key);
+                    const raw = localStorage.getItem(legacyKey);
                     if (raw) {
                         let legacy: CommentMap;
                         try {
                             legacy = JSON.parse(raw) as CommentMap;
                         } catch {
-                            localStorage.removeItem(key);
+                            localStorage.removeItem(legacyKey);
+                            migratedLegacyKeysRef.current.add(legacyKey);
                             setLoadedScope(requestKey);
                             return;
                         }
@@ -164,9 +167,11 @@ export function useComments(options: Options) {
                             setLoadedScope(requestKey);
                             throw cause;
                         }
-                        localStorage.removeItem(key);
+                        localStorage.removeItem(legacyKey);
+                        migratedLegacyKeysRef.current.add(legacyKey);
                         if (applySnapshot(imported, requestKey)) etagRef.current = null;
                     } else {
+                        migratedLegacyKeysRef.current.add(legacyKey);
                         setLoadedScope(requestKey);
                     }
                 }
@@ -180,7 +185,7 @@ export function useComments(options: Options) {
 
     useEffect(() => {
         setLoadedScope(null);
-        load(true).catch(() => {});
+        load().catch(() => {});
         const timer = window.setInterval(() => {
             if (document.visibilityState === "visible") {
                 load().catch(() => {});
