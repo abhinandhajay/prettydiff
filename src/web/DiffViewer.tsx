@@ -12,6 +12,7 @@ import {
     allCommentIds,
     buildFileIndex,
     commentKey,
+    commentsForPath,
     formatCommentsForCopy,
     reconcileCommentSelection,
 } from "@/lib/comments";
@@ -26,11 +27,10 @@ import { flushSync } from "react-dom";
 
 import type { ViewMode } from "@/components/ViewToggle";
 import type { PatchLineIndex } from "@/lib/comments";
-import type { DiffComment, DiffPayload, DraftLine, ParsedFile, RepoInfo } from "@/lib/types";
+import type { DiffPayload, DraftLine, ParsedFile, RepoInfo } from "@/lib/types";
 import type * as React from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 
-const EMPTY_COMMENTS: DiffComment[] = [];
 const EMPTY_PATCH_INDEX: PatchLineIndex = {
     additions: new Map(),
     deletions: new Map(),
@@ -75,6 +75,19 @@ function yieldForPaint(): Promise<void> {
 
 function clampLeftPanelWidth(width: number): number {
     return Math.min(MAX_LEFT_PANEL_WIDTH, Math.max(MIN_LEFT_PANEL_WIDTH, Math.round(width)));
+}
+
+function ownValue<T>(record: Record<string, T>, key: string): T | undefined {
+    return Object.hasOwn(record, key) ? record[key] : undefined;
+}
+
+function setOwnValue<T>(record: Record<string, T>, key: string, value: T): void {
+    Object.defineProperty(record, key, {
+        value,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+    });
 }
 
 function buildRenderMeta(files: ParsedFile[]): DiffRenderMeta {
@@ -385,7 +398,7 @@ export function DiffViewer({
                     }
                     if (mode === "initial") {
                         const init: Record<string, boolean> = {};
-                        for (const f of p.files) init[f.path] = true;
+                        for (const f of p.files) setOwnValue(init, f.path, true);
                         setOpenMap(init);
                         if (p.files[0]) setActivePath(p.files[0].path);
                     } else {
@@ -393,7 +406,7 @@ export function DiffViewer({
                         setOpenMap((prev) => {
                             const next: Record<string, boolean> = {};
                             for (const f of p.files) {
-                                next[f.path] = prev[f.path] ?? true;
+                                setOwnValue(next, f.path, ownValue(prev, f.path) ?? true);
                             }
                             return next;
                         });
@@ -442,20 +455,20 @@ export function DiffViewer({
     const expandAll = useCallback(() => {
         if (!payload) return;
         const m: Record<string, boolean> = {};
-        for (const f of payload.files) m[f.path] = true;
+        for (const f of payload.files) setOwnValue(m, f.path, true);
         setOpenMap(m);
     }, [payload]);
 
     const collapseAll = useCallback(() => {
         if (!payload) return;
         const m: Record<string, boolean> = {};
-        for (const f of payload.files) m[f.path] = false;
+        for (const f of payload.files) setOwnValue(m, f.path, false);
         setOpenMap(m);
     }, [payload]);
 
     const fileScrollCancelRef = useRef<(() => void) | null>(null);
     const scrollToFile = useCallback((path: string) => {
-        setOpenMap((m) => (m[path] ? m : { ...m, [path]: true }));
+        setOpenMap((m) => (ownValue(m, path) ? m : { ...m, [path]: true }));
         const scroller = mainRef.current;
         if (!scroller) return;
         // Cancel any in-flight file scroll so rapid clicks don't fight.
@@ -517,7 +530,7 @@ export function DiffViewer({
     );
 
     const allExpanded = useMemo(
-        () => (payload ? payload.files.every((f) => openMap[f.path] ?? true) : true),
+        () => (payload ? payload.files.every((f) => ownValue(openMap, f.path) ?? true) : true),
         [payload, openMap],
     );
 
@@ -591,7 +604,7 @@ export function DiffViewer({
 
     const toggleFileSelection = useCallback(
         (filePath: string, select: boolean) => {
-            const list = comments[filePath] ?? [];
+            const list = commentsForPath(comments, filePath);
             setSelectedCommentIds((prev) => {
                 const next = new Set(prev);
                 for (const c of list) {
@@ -694,7 +707,7 @@ export function DiffViewer({
 
     useEffect(() => {
         if (!activeDraft) return;
-        const list = comments[activeDraft.filePath] ?? [];
+        const list = commentsForPath(comments, activeDraft.filePath);
         const k = commentKey(activeDraft);
         if (list.some((c) => !c.stale && commentKey(c) === k)) {
             setActiveDraft(null);
@@ -720,11 +733,11 @@ export function DiffViewer({
                         <FileCard
                             key={f.path}
                             file={f}
-                            open={openMap[f.path] ?? true}
+                            open={ownValue(openMap, f.path) ?? true}
                             onOpenChange={setOpen}
                             viewMode={viewMode}
                             wrap={wrap}
-                            comments={comments[f.path] ?? EMPTY_COMMENTS}
+                            comments={commentsForPath(comments, f.path)}
                             patchIndex={meta?.patchIndex ?? EMPTY_PATCH_INDEX}
                             estimatedHeight={meta?.estimatedHeight ?? ESTIMATED_DIFF_HEADER_HEIGHT}
                             eager={index < eagerDiffCardCount}

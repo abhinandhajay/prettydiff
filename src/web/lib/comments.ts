@@ -54,6 +54,14 @@ export interface PatchLineIndex {
     patchDeletions: Set<number>;
 }
 
+const EMPTY_COMMENT_LIST: DiffComment[] = [];
+
+export function commentsForPath(comments: CommentMap, filePath: string): DiffComment[] {
+    return Object.hasOwn(comments, filePath)
+        ? (comments[filePath] ?? EMPTY_COMMENT_LIST)
+        : EMPTY_COMMENT_LIST;
+}
+
 interface PatchScan {
     additions: Map<number, string>;
     deletions: Map<number, string>;
@@ -156,7 +164,12 @@ export function markStaleComments(
                 return { ...c, stale: true };
             });
             if (listChanged) changed = true;
-            next[path] = listChanged ? updated : list;
+            Object.defineProperty(next, path, {
+                value: listChanged ? updated : list,
+                enumerable: true,
+                configurable: true,
+                writable: true,
+            });
             continue;
         }
         const idx = indexByPath?.get(path) ?? buildFileIndex(file);
@@ -170,7 +183,12 @@ export function markStaleComments(
             return { ...c, stale };
         });
         if (listChanged) changed = true;
-        next[path] = listChanged ? updated : list;
+        Object.defineProperty(next, path, {
+            value: listChanged ? updated : list,
+            enumerable: true,
+            configurable: true,
+            writable: true,
+        });
     }
     return changed ? next : comments;
 }
@@ -238,7 +256,8 @@ function langFromPath(path: string): string {
     const base = path.split("/").pop() ?? "";
     const dot = base.lastIndexOf(".");
     if (dot < 0) return "";
-    return EXT_TO_LANG[base.slice(dot + 1).toLowerCase()] ?? "";
+    const extension = base.slice(dot + 1).toLowerCase();
+    return Object.hasOwn(EXT_TO_LANG, extension) ? (EXT_TO_LANG[extension] ?? "") : "";
 }
 
 function sideLabel(side: CommentSide, lineType: DiffComment["lineType"]): string {

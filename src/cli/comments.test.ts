@@ -73,6 +73,14 @@ describe("comments help", () => {
         expect(missing.stderr).toContain("--side must be additions or deletions");
     });
 
+    test("rejects command names inherited from Object.prototype", async () => {
+        expect(await run(["__proto__"])).toEqual({
+            code: 2,
+            stdout: "",
+            stderr: 'prettydiff: unknown comments command: __proto__\nRun "prettydiff comments --help" for usage.\n',
+        });
+    });
+
     test("preserves the shell continuation in the add example", () => {
         expect(COMMENTS_ADD_HELP).toContain("--line 42 \\\n      --body");
     });

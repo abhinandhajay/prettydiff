@@ -5,9 +5,18 @@ interface LineInfo {
     lineType: CommentLineType;
 }
 
-function changedLines(rawPatch: string): { additions: Set<number>; deletions: Set<number> } {
+interface PatchLines {
+    additions: Set<number>;
+    deletions: Set<number>;
+    patchAdditions: Set<number>;
+    patchDeletions: Set<number>;
+}
+
+function patchLines(rawPatch: string): PatchLines {
     const additions = new Set<number>();
     const deletions = new Set<number>();
+    const patchAdditions = new Set<number>();
+    const patchDeletions = new Set<number>();
     let addLine = 0;
     let delLine = 0;
     let inHunk = false;
@@ -23,15 +32,19 @@ function changedLines(rawPatch: string): { additions: Set<number>; deletions: Se
         }
         if (!inHunk || line.startsWith("\\")) continue;
         if (line.startsWith("+")) {
-            additions.add(addLine++);
+            additions.add(addLine);
+            patchAdditions.add(addLine++);
         } else if (line.startsWith("-")) {
-            deletions.add(delLine++);
+            deletions.add(delLine);
+            patchDeletions.add(delLine++);
         } else if (line.startsWith(" ")) {
+            patchAdditions.add(addLine);
+            patchDeletions.add(delLine);
             addLine++;
             delLine++;
         }
     }
-    return { additions, deletions };
+    return { additions, deletions, patchAdditions, patchDeletions };
 }
 
 export function lineInfo(file: ParsedFile, side: CommentSide, lineNumber: number): LineInfo | null {
@@ -41,18 +54,24 @@ export function lineInfo(file: ParsedFile, side: CommentSide, lineNumber: number
     if (lines.at(-1) === "") lines.pop();
     const text = lines[lineNumber - 1];
     if (text === undefined) return null;
-    const changed = changedLines(file.rawPatch);
+    const changed = patchLines(file.rawPatch);
     const isChanged =
         side === "additions"
             ? changed.additions.has(lineNumber)
             : changed.deletions.has(lineNumber);
+    const isPatchContext =
+        side === "additions"
+            ? changed.patchAdditions.has(lineNumber)
+            : changed.patchDeletions.has(lineNumber);
     return {
         text,
         lineType: isChanged
             ? side === "additions"
                 ? "change-addition"
                 : "change-deletion"
-            : "context-expanded",
+            : isPatchContext
+              ? "context"
+              : "context-expanded",
     };
 }
 
@@ -61,10 +80,16 @@ export function stampStale(comments: CommentMap, files: ParsedFile[]): CommentMa
     const result: CommentMap = {};
     for (const [filePath, list] of Object.entries(comments)) {
         const file = byPath.get(filePath);
-        result[filePath] = list.map((comment) => {
+        const stamped = list.map((comment) => {
             const info = file ? lineInfo(file, comment.side, comment.lineNumber) : null;
             const stale = !info || info.text !== comment.lineText;
             return stale === Boolean(comment.stale) ? comment : { ...comment, stale };
+        });
+        Object.defineProperty(result, filePath, {
+            value: stamped,
+            enumerable: true,
+            configurable: true,
+            writable: true,
         });
     }
     return result;

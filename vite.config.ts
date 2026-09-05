@@ -108,6 +108,25 @@ function fixtureFor(url: URL): string {
     }
 }
 
+function appendRecordItem(record: Record<string, unknown[]>, key: string, item: unknown): void {
+    const existing = Object.hasOwn(record, key) ? record[key] : undefined;
+    Object.defineProperty(record, key, {
+        value: existing ? [...existing, item] : [item],
+        enumerable: true,
+        configurable: true,
+        writable: true,
+    });
+}
+
+function setRecordItems(record: Record<string, unknown[]>, key: string, items: unknown[]): void {
+    Object.defineProperty(record, key, {
+        value: items,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+    });
+}
+
 export default defineConfig({
     root: here,
     plugins: [
@@ -169,7 +188,7 @@ export default defineConfig({
                                     const comment = item as { id?: string; author?: unknown };
                                     if (!comment.id || known.has(comment.id)) continue;
                                     comment.author ??= { kind: "user" };
-                                    (merged[filePath] ??= []).push(comment);
+                                    appendRecordItem(merged, filePath, comment);
                                     known.add(comment.id);
                                 }
                             }
@@ -184,7 +203,7 @@ export default defineConfig({
                                 author: { kind: "user" },
                             };
                             const merged = structuredClone(snapshot.comments);
-                            ((merged[body.filePath as string] ??= []) as unknown[]).push(comment);
+                            appendRecordItem(merged, body.filePath as string, comment);
                             const next = {
                                 revision: snapshot.revision + 1,
                                 comments: merged,
@@ -215,7 +234,7 @@ export default defineConfig({
                                     }
                                     return item;
                                 });
-                            if (changed.length) merged[filePath] = changed;
+                            if (changed.length) setRecordItems(merged, filePath, changed);
                         }
                         if (!found) sendJson({ error: "comment not found" }, 404);
                         else save(merged);

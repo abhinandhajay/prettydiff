@@ -179,7 +179,7 @@ export async function runCommentsCommand(argv: string[], io: CommandIo): Promise
         update: COMMENTS_UPDATE_HELP,
         delete: COMMENTS_DELETE_HELP,
     };
-    const help = helpByCommand[command];
+    const help = Object.hasOwn(helpByCommand, command) ? helpByCommand[command] : undefined;
     if (!help) return usageError(io, `unknown comments command: ${command}`, "prettydiff comments");
 
     const commandArgv = argv.slice(1);

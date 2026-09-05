@@ -53,6 +53,32 @@ describe("CommentStore", () => {
         expect((await store.get(repoId, repoRoot)).comments).toEqual({});
     });
 
+    test("supports reserved object property names as file paths", async () => {
+        const store = new CommentStore(await makeTmpDir());
+        const special = { ...comment("special"), filePath: "__proto__" };
+        const remaining = { ...comment("remaining"), filePath: "__proto__" };
+        await store.create(repoId, repoRoot, special);
+        await store.create(repoId, repoRoot, remaining);
+        await store.delete(repoId, repoRoot, special.id);
+
+        const saved = await store.get(repoId, repoRoot);
+        expect(Object.hasOwn(saved.comments, "__proto__")).toBe(true);
+        expect(saved.comments["__proto__"]).toEqual([remaining]);
+    });
+
+    test("imports valid comments by their own file path and skips malformed entries", async () => {
+        const store = new CommentStore(await makeTmpDir());
+        const imported = { ...comment("imported"), filePath: "right.txt" };
+        await store.import(repoId, repoRoot, {
+            "wrong.txt": [imported, null],
+            "not-a-list": null,
+        } as never);
+
+        const saved = await store.get(repoId, repoRoot);
+        expect(saved.comments["wrong.txt"]).toBeUndefined();
+        expect(saved.comments["right.txt"]).toEqual([imported]);
+    });
+
     test("serializes concurrent mutations without losing comments", async () => {
         const dir = await makeTmpDir();
         const a = new CommentStore(dir);
@@ -94,6 +120,24 @@ describe("CommentStore", () => {
                 repoRoot,
                 revision: 1,
                 comments: { "a.txt": [{ ...comment("malformed"), lineType: "unexpected" }] },
+            }),
+        );
+        await expect(new CommentStore(dir).get(repoId, repoRoot)).rejects.toThrow(
+            "cannot read stored comments",
+        );
+    });
+
+    test("refuses persisted comments stored under the wrong file path", async () => {
+        const dir = await makeTmpDir();
+        const reviews = path.join(dir, "reviews");
+        await mkdir(reviews, { recursive: true });
+        await writeFile(
+            path.join(reviews, `${repoId}.json`),
+            JSON.stringify({
+                schemaVersion: 1,
+                repoRoot,
+                revision: 1,
+                comments: { "wrong.txt": [comment("mismatched")] },
             }),
         );
         await expect(new CommentStore(dir).get(repoId, repoRoot)).rejects.toThrow(

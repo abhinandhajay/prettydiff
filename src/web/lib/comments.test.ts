@@ -4,6 +4,7 @@ import {
     allCommentIds,
     buildFileIndex,
     commentKey,
+    commentsForPath,
     commentsByKey,
     formatCommentsForCopy,
     markStaleComments,
@@ -95,6 +96,19 @@ describe("commentKey", () => {
         const b = commentKey({ filePath: "x.ts", side: "deletions", lineNumber: 2 });
         const c = commentKey({ filePath: "x.ts", side: "additions", lineNumber: 3 });
         expect(new Set([a, b, c]).size).toBe(3);
+    });
+});
+
+describe("commentsForPath", () => {
+    it("treats inherited object properties as absent file paths", () => {
+        expect(commentsForPath({}, "__proto__")).toEqual([]);
+        expect(commentsForPath({}, "constructor")).toEqual([]);
+    });
+
+    it("returns an own __proto__ comment bucket", () => {
+        const list = [makeComment({ filePath: "__proto__" })];
+        const comments = Object.fromEntries([["__proto__", list]]);
+        expect(commentsForPath(comments, "__proto__")).toBe(list);
     });
 });
 
@@ -237,6 +251,15 @@ describe("formatCommentsForCopy", () => {
     it("uses a bare fence for unknown extensions", () => {
         const comments: CommentMap = {
             "notes.xyz": [makeComment({ filePath: "notes.xyz" })],
+        };
+        expect(formatCommentsForCopy(new Set(["c1"]), comments, payload)).toContain(
+            "```\nB-changed\n```",
+        );
+    });
+
+    it("uses a bare fence for extensions inherited from Object.prototype", () => {
+        const comments: CommentMap = {
+            "notes.constructor": [makeComment({ filePath: "notes.constructor" })],
         };
         expect(formatCommentsForCopy(new Set(["c1"]), comments, payload)).toContain(
             "```\nB-changed\n```",

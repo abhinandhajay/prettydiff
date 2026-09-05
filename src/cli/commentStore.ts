@@ -48,6 +48,22 @@ function isComment(value: unknown): value is DiffComment {
     );
 }
 
+function appendComment(comments: CommentMap, comment: DiffComment): void {
+    const existing = Object.hasOwn(comments, comment.filePath)
+        ? comments[comment.filePath]
+        : undefined;
+    if (existing) {
+        existing.push(comment);
+        return;
+    }
+    Object.defineProperty(comments, comment.filePath, {
+        value: [comment],
+        enumerable: true,
+        configurable: true,
+        writable: true,
+    });
+}
+
 function validateStored(value: unknown): StoredReview {
     const review = value as Partial<StoredReview> | null;
     if (
@@ -60,8 +76,20 @@ function validateStored(value: unknown): StoredReview {
     ) {
         throw new Error("invalid review data");
     }
-    for (const list of Object.values(review.comments)) {
-        if (!Array.isArray(list) || !list.every(isComment)) throw new Error("invalid review data");
+    if (
+        !Number.isInteger(review.revision) ||
+        review.revision < 0 ||
+        Array.isArray(review.comments)
+    ) {
+        throw new Error("invalid review data");
+    }
+    for (const [filePath, list] of Object.entries(review.comments)) {
+        if (
+            !Array.isArray(list) ||
+            !list.every((comment) => isComment(comment) && comment.filePath === filePath)
+        ) {
+            throw new Error("invalid review data");
+        }
     }
     return review as StoredReview;
 }
@@ -157,14 +185,16 @@ export class CommentStore {
                     .flat()
                     .map((comment) => comment.id),
             );
-            for (const [filePath, list] of Object.entries(incoming)) {
+            for (const list of Object.values(incoming)) {
+                if (!Array.isArray(list)) continue;
                 for (const raw of list) {
+                    if (!raw || typeof raw !== "object") continue;
                     const comment: DiffComment = {
                         ...raw,
                         author: raw.author ?? { kind: "user" },
                     };
                     if (!isComment(comment) || known.has(comment.id)) continue;
-                    (review.comments[filePath] ??= []).push(comment);
+                    appendComment(review.comments, comment);
                     known.add(comment.id);
                 }
             }
@@ -181,7 +211,7 @@ export class CommentStore {
             ) {
                 throw new Error("comment id already exists");
             }
-            (review.comments[comment.filePath] ??= []).push(comment);
+            appendComment(review.comments, comment);
         });
     }
 
@@ -201,8 +231,14 @@ export class CommentStore {
             for (const [filePath, list] of Object.entries(review.comments)) {
                 const filtered = list.filter((item) => item.id !== id);
                 found ||= filtered.length !== list.length;
-                if (filtered.length) review.comments[filePath] = filtered;
-                else delete review.comments[filePath];
+                if (filtered.length) {
+                    Object.defineProperty(review.comments, filePath, {
+                        value: filtered,
+                        enumerable: true,
+                        configurable: true,
+                        writable: true,
+                    });
+                } else delete review.comments[filePath];
             }
             if (!found) throw new Error("comment not found");
         });

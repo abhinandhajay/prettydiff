@@ -1,3 +1,4 @@
+import { commentsForPath } from "@/lib/comments";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CommentMap, CommentSnapshot, DiffComment, DraftLine } from "@/lib/types";
@@ -19,7 +20,7 @@ const EMPTY_COMMENTS: CommentMap = {};
 function addComment(comments: CommentMap, comment: DiffComment): CommentMap {
     return {
         ...comments,
-        [comment.filePath]: [...(comments[comment.filePath] ?? []), comment],
+        [comment.filePath]: [...commentsForPath(comments, comment.filePath), comment],
     };
 }
 
@@ -27,7 +28,14 @@ function removeComment(comments: CommentMap, id: string): CommentMap {
     const result: CommentMap = {};
     for (const [filePath, list] of Object.entries(comments)) {
         const remaining = list.filter((comment) => comment.id !== id);
-        if (remaining.length) result[filePath] = remaining;
+        if (remaining.length) {
+            Object.defineProperty(result, filePath, {
+                value: remaining,
+                enumerable: true,
+                configurable: true,
+                writable: true,
+            });
+        }
     }
     return result;
 }
