@@ -233,12 +233,14 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
             filePath?: string;
             side?: "additions" | "deletions";
             lineNumber?: number;
+            lineText?: string;
             body?: string;
         }>(c);
         if (
             typeof body?.filePath !== "string" ||
             (body.side !== "additions" && body.side !== "deletions") ||
             typeof body.lineNumber !== "number" ||
+            typeof body.lineText !== "string" ||
             typeof body.body !== "string"
         ) {
             return c.json({ error: "invalid request" }, 400);
@@ -251,6 +253,7 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
                 filePath: body.filePath,
                 side: body.side,
                 lineNumber: body.lineNumber,
+                lineText: body.lineText,
                 body: body.body,
                 author: { kind: "user" },
             });

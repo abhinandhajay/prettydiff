@@ -87,6 +87,27 @@ describe("comments help", () => {
 });
 
 describe("comments commands", () => {
+    test.each([
+        { lineArgs: ["--line"] },
+        { lineArgs: ["--line", "--body", "note"] },
+        { lineArgs: ["--line="] },
+    ])("rejects a line option without a value", async ({ lineArgs }) => {
+        const before = await run(["list"]);
+        const result = await run([
+            "add",
+            "--file",
+            "a.txt",
+            "--side",
+            "additions",
+            "--body",
+            "note",
+            ...lineArgs,
+        ]);
+        expect(result.code).toBe(2);
+        expect(result.stderr).toContain("--line must be a positive integer");
+        expect(await run(["list"])).toEqual(before);
+    });
+
     let id: string;
 
     test("adds a validated agent comment and returns JSON", async () => {
@@ -279,12 +300,35 @@ describe("CLI and browser server sharing", () => {
                     filePath: "shared.txt",
                     side: "additions",
                     lineNumber: 1,
+                    lineText: "after",
                     body: "From browser",
                 }),
             });
             expect(browserCreate.status).toBe(200);
 
             await writeRepoFile(sharedRepo, "shared.txt", "later\n");
+            const beforeRejected = await (await fetch(`${server.url}/api/comments`)).json();
+            for (const lineText of ["after", undefined, 123]) {
+                const rejected = await fetch(`${server.url}/api/comments`, {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                        filePath: "shared.txt",
+                        side: "additions",
+                        lineNumber: 1,
+                        lineText,
+                        body: "Obsolete draft",
+                    }),
+                });
+                expect(rejected.status).toBe(400);
+                expect((await rejected.json()).error).toContain(
+                    lineText === "after" ? "line has changed" : "invalid request",
+                );
+            }
+            expect(await (await fetch(`${server.url}/api/comments`)).json()).toEqual(
+                beforeRejected,
+            );
+
             const browserUpdate = await fetch(
                 `${server.url}/api/comments/${encodeURIComponent(cliComment.id)}`,
                 {

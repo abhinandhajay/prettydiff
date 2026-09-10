@@ -99,6 +99,7 @@ export function createValidatedComment(
         filePath: string;
         side: CommentSide;
         lineNumber: number;
+        lineText?: string;
         body: string;
         author: DiffComment["author"];
     },
@@ -106,6 +107,9 @@ export function createValidatedComment(
     if (!file) throw new Error("file is not part of this diff");
     const info = lineInfo(file, input.side, input.lineNumber);
     if (!info) throw new Error("line is not present on the selected side");
+    if (input.lineText !== undefined && input.lineText !== info.text) {
+        throw new Error("line has changed; reload the diff before commenting");
+    }
     const body = input.body.trim();
     if (!body) throw new Error("comment body is required");
     return {

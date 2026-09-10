@@ -203,7 +203,7 @@ export async function runCommentsCommand(argv: string[], io: CommandIo): Promise
 
     const args = mri(commandArgv, {
         boolean: ["help", "include-working-tree"],
-        string: ["target", "target-ref", "file", "side", "body", "author", "id"],
+        string: ["target", "target-ref", "file", "side", "line", "body", "author", "id"],
         default: { "include-working-tree": true },
         alias: { h: "help" },
     });
