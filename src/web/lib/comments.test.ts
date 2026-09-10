@@ -4,10 +4,10 @@ import {
     allCommentIds,
     buildFileIndex,
     commentKey,
+    commentsForPath,
     commentsByKey,
     formatCommentsForCopy,
-    markStaleComments,
-    type PatchLineIndex,
+    reconcileCommentSelection,
 } from "@/lib/comments";
 
 import type { CommentMap, DiffComment, ParsedFile } from "@/lib/types";
@@ -97,6 +97,19 @@ describe("commentKey", () => {
     });
 });
 
+describe("commentsForPath", () => {
+    it("treats inherited object properties as absent file paths", () => {
+        expect(commentsForPath({}, "__proto__")).toEqual([]);
+        expect(commentsForPath({}, "constructor")).toEqual([]);
+    });
+
+    it("returns an own __proto__ comment bucket", () => {
+        const list = [makeComment({ filePath: "__proto__" })];
+        const comments = Object.fromEntries([["__proto__", list]]);
+        expect(commentsForPath(comments, "__proto__")).toBe(list);
+    });
+});
+
 describe("commentsByKey", () => {
     it("groups comments on the same line preserving order", () => {
         const first = makeComment({ id: "c1" });
@@ -124,52 +137,28 @@ describe("allCommentIds", () => {
     });
 });
 
-describe("markStaleComments", () => {
-    it("returns the same reference when nothing changed", () => {
-        const comments: CommentMap = { "x.ts": [makeComment()] };
-        const result = markStaleComments(comments, [modified]);
-        expect(result).toBe(comments);
-        expect(result["x.ts"]).toBe(comments["x.ts"]);
-    });
-
-    it("marks comments stale when their file disappears", () => {
-        const comments: CommentMap = { "gone.ts": [makeComment({ filePath: "gone.ts" })] };
-        const result = markStaleComments(comments, [modified]);
-        expect(result).not.toBe(comments);
-        expect(result["gone.ts"]![0]!.stale).toBe(true);
-    });
-
-    it("keeps identity when a missing file's comments are already stale", () => {
-        const comments: CommentMap = {
-            "gone.ts": [makeComment({ filePath: "gone.ts", stale: true })],
+describe("reconcileCommentSelection", () => {
+    it("keeps manual deselection, selects new comments, and drops removed ids", () => {
+        const before = {
+            "x.ts": [
+                makeComment({ id: "kept" }),
+                makeComment({ id: "deselected" }),
+                makeComment({ id: "removed" }),
+            ],
         };
-        expect(markStaleComments(comments, [])).toBe(comments);
-    });
-
-    it("marks comments stale when the line text drifts", () => {
-        const comments: CommentMap = { "x.ts": [makeComment({ lineText: "old text" })] };
-        const result = markStaleComments(comments, [modified]);
-        expect(result["x.ts"]![0]!.stale).toBe(true);
-    });
-
-    it("revives stale comments whose line text matches again", () => {
-        const comments: CommentMap = { "x.ts": [makeComment({ stale: true })] };
-        const result = markStaleComments(comments, [modified]);
-        expect(result["x.ts"]![0]!.stale).toBe(false);
-    });
-
-    it("prefers a supplied index over rebuilding", () => {
-        const doctored: PatchLineIndex = {
-            additions: new Map([[2, "doctored"]]),
-            deletions: new Map(),
-            changedAdditions: new Set(),
-            changedDeletions: new Set(),
-            patchAdditions: new Set(),
-            patchDeletions: new Set(),
+        const after = {
+            "x.ts": [
+                makeComment({ id: "kept" }),
+                makeComment({ id: "deselected" }),
+                makeComment({ id: "new" }),
+            ],
         };
-        const comments: CommentMap = { "x.ts": [makeComment({ lineText: "doctored" })] };
-        const result = markStaleComments(comments, [modified], new Map([["x.ts", doctored]]));
-        expect(result).toBe(comments);
+        const result = reconcileCommentSelection(
+            new Set(["kept", "removed"]),
+            new Set(allCommentIds(before, true)),
+            after,
+        );
+        expect([...result]).toEqual(["kept", "new"]);
     });
 });
 
@@ -211,6 +200,15 @@ describe("formatCommentsForCopy", () => {
     it("uses a bare fence for unknown extensions", () => {
         const comments: CommentMap = {
             "notes.xyz": [makeComment({ filePath: "notes.xyz" })],
+        };
+        expect(formatCommentsForCopy(new Set(["c1"]), comments, payload)).toContain(
+            "```\nB-changed\n```",
+        );
+    });
+
+    it("uses a bare fence for extensions inherited from Object.prototype", () => {
+        const comments: CommentMap = {
+            "notes.constructor": [makeComment({ filePath: "notes.constructor" })],
         };
         expect(formatCommentsForCopy(new Set(["c1"]), comments, payload)).toContain(
             "```\nB-changed\n```",

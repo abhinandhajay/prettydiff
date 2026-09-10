@@ -11,7 +11,7 @@ import {
     writeRepoFile,
 } from "../../test/helpers/tmpRepo";
 
-import { getDiffPayload, getRepoRoot } from "./git.js";
+import { getDiffFile, getDiffPayload, getDiffPayloadForFiles, getRepoRoot } from "./git.js";
 
 import type { ParsedFile } from "./types.js";
 
@@ -119,6 +119,77 @@ describe("getDiffPayload — working tree", () => {
             expect(file.rawPatch.startsWith("diff --git")).toBe(true);
             expect(file.oldContents).toBe("one\ntwo\nthree\n");
             expect(file.newContents).toBe("one\n2\nthree\nfour\n");
+        },
+        TIMEOUT,
+    );
+
+    test(
+        "can limit tracked and untracked work to selected files",
+        async () => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "a.txt", "a\n");
+            await commitFile(repo, "b.txt", "b\n");
+            await writeRepoFile(repo, "a.txt", "changed a\n");
+            await writeRepoFile(repo, "b.txt", "changed b\n");
+            await writeRepoFile(repo, "note.txt", "note\n");
+
+            expect(
+                (await getDiffPayloadForFiles(repo, ["a.txt"]))!.files.map((f) => f.path),
+            ).toEqual(["a.txt"]);
+            expect(
+                (await getDiffPayloadForFiles(repo, ["note.txt"]))!.files.map((f) => f.path),
+            ).toEqual(["note.txt"]);
+            expect((await getDiffPayloadForFiles(repo, []))!.files).toEqual([]);
+        },
+        TIMEOUT,
+    );
+
+    test(
+        "loads one review file without building repository metadata",
+        async () => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "a.txt", "before\n");
+            await writeRepoFile(repo, "a.txt", "after\n");
+
+            const file = await getDiffFile(repo, "a.txt");
+            expect(file).toEqual(
+                expect.objectContaining({
+                    path: "a.txt",
+                    oldContents: "before\n",
+                    newContents: "after\n",
+                }),
+            );
+            expect(await getDiffFile(repo, "missing.txt")).toBeUndefined();
+        },
+        TIMEOUT,
+    );
+
+    test(
+        "preserves both sides when filtering renamed review files",
+        async () => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "old.txt", "line1\nline2\nline3\nline4\n");
+            await runGit(repo, "mv", "old.txt", "new.txt");
+            await writeRepoFile(repo, "new.txt", "line1\nchanged\nline3\nline4\n");
+
+            const singleFile = await getDiffFile(repo, "new.txt");
+            const batchedFile = fileByPath(
+                (await getDiffPayloadForFiles(repo, ["new.txt"]))!.files,
+                "new.txt",
+            );
+            for (const file of [singleFile, batchedFile]) {
+                expect(file).toEqual(
+                    expect.objectContaining({
+                        path: "new.txt",
+                        oldPath: "old.txt",
+                        status: "renamed",
+                        oldContents: "line1\nline2\nline3\nline4\n",
+                        newContents: "line1\nchanged\nline3\nline4\n",
+                    }),
+                );
+                expect(file!.rawPatch).toContain("-line2");
+                expect(file!.rawPatch).toContain("+changed");
+            }
         },
         TIMEOUT,
     );
@@ -322,7 +393,10 @@ describe("getDiffPayload — branch mode", () => {
     test(
         "diffs against the merge base and includes working tree by default",
         async () => {
-            const payload = await getDiffPayload(repo, { target: "branch", targetRef: "main" });
+            const payload = await getDiffPayload(repo, {
+                target: "branch",
+                targetRef: "main",
+            });
             if (!payload) throw new Error("payload was null");
             expect(payload.target).toBe("branch");
             expect(payload.targetRef).toBe("main");
@@ -382,7 +456,10 @@ describe("getDiffPayload — branch mode", () => {
             await commitFile(orphaned, "a.txt", "a\n");
             await runGit(orphaned, "checkout", "-q", "--orphan", "orphan");
             await runGit(orphaned, "commit", "-m", "orphan root");
-            const payload = await getDiffPayload(orphaned, { target: "branch", targetRef: "main" });
+            const payload = await getDiffPayload(orphaned, {
+                target: "branch",
+                targetRef: "main",
+            });
             if (!payload) throw new Error("payload was null");
             expect(payload.targetRef).toBe("main");
             expect(payload.mergeBase).toBeUndefined();

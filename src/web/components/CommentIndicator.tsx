@@ -61,6 +61,14 @@ export function CommentIndicator({ comment, onEdit, onDelete, onFocusInSidebar, 
                         <span className="text-muted-foreground/60 font-mono text-[10.5px] tabular-nums">
                             {formatRelativeTime(comment.createdAt)}
                         </span>
+                        {comment.author?.kind === "agent" ? (
+                            <Badge
+                                variant="secondary"
+                                className="px-1 py-0 text-[9.5px] font-normal"
+                            >
+                                {comment.author.name ?? "Agent"}
+                            </Badge>
+                        ) : null}
                         {stale ? (
                             <Badge
                                 variant="outline"

@@ -352,6 +352,14 @@ function CommentRow({
                                 outdated
                             </Badge>
                         ) : null}
+                        {comment.author?.kind === "agent" ? (
+                            <Badge
+                                variant="secondary"
+                                className="px-1 py-0 text-[9.5px] font-normal"
+                            >
+                                {comment.author.name ?? "Agent"}
+                            </Badge>
+                        ) : null}
                         <span className="text-muted-foreground/55 ml-auto shrink-0 text-[10px] tabular-nums">
                             {formatRelativeTime(comment.createdAt)}
                         </span>

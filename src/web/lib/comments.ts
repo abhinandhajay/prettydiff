@@ -54,6 +54,14 @@ export interface PatchLineIndex {
     patchDeletions: Set<number>;
 }
 
+const EMPTY_COMMENT_LIST: DiffComment[] = [];
+
+export function commentsForPath(comments: CommentMap, filePath: string): DiffComment[] {
+    return Object.hasOwn(comments, filePath)
+        ? (comments[filePath] ?? EMPTY_COMMENT_LIST)
+        : EMPTY_COMMENT_LIST;
+}
+
 interface PatchScan {
     additions: Map<number, string>;
     deletions: Map<number, string>;
@@ -116,7 +124,7 @@ function splitFileLines(contents: string): string[] {
  * mark which lines are genuine changes vs context (and which context lines were inside the original
  * hunks).
  */
-function buildContentsIndex(file: ParsedFile): PatchLineIndex {
+export function buildFileIndex(file: ParsedFile): PatchLineIndex {
     const scan = scanPatch(file.rawPatch);
     const additions = new Map<number, string>();
     const deletions = new Map<number, string>();
@@ -134,47 +142,6 @@ function buildContentsIndex(file: ParsedFile): PatchLineIndex {
     };
 }
 
-export function buildFileIndex(file: ParsedFile): PatchLineIndex {
-    return buildContentsIndex(file);
-}
-
-export function markStaleComments(
-    comments: CommentMap,
-    files: ParsedFile[],
-    indexByPath?: Map<string, PatchLineIndex>,
-): CommentMap {
-    const byPath = new Map(files.map((f) => [f.path, f] as const));
-    const next: CommentMap = {};
-    let changed = false;
-    for (const [path, list] of Object.entries(comments)) {
-        const file = byPath.get(path);
-        if (!file) {
-            let listChanged = false;
-            const updated = list.map((c) => {
-                if (c.stale) return c;
-                listChanged = true;
-                return { ...c, stale: true };
-            });
-            if (listChanged) changed = true;
-            next[path] = listChanged ? updated : list;
-            continue;
-        }
-        const idx = indexByPath?.get(path) ?? buildFileIndex(file);
-        let listChanged = false;
-        const updated = list.map((c) => {
-            const map = c.side === "additions" ? idx.additions : idx.deletions;
-            const current = map.get(c.lineNumber);
-            const stale = current === undefined || current !== c.lineText;
-            if (stale === Boolean(c.stale)) return c;
-            listChanged = true;
-            return { ...c, stale };
-        });
-        if (listChanged) changed = true;
-        next[path] = listChanged ? updated : list;
-    }
-    return changed ? next : comments;
-}
-
 export function allCommentIds(comments: CommentMap, includeStale = false): string[] {
     const ids: string[] = [];
     for (const list of Object.values(comments)) {
@@ -184,6 +151,20 @@ export function allCommentIds(comments: CommentMap, includeStale = false): strin
         }
     }
     return ids;
+}
+
+export function reconcileCommentSelection(
+    selectedIds: Set<string>,
+    knownIds: Set<string>,
+    comments: CommentMap,
+): Set<string> {
+    const activeIds = allCommentIds(comments);
+    const currentIds = new Set(allCommentIds(comments, true));
+    const next = new Set([...selectedIds].filter((id) => currentIds.has(id)));
+    for (const id of activeIds) {
+        if (!knownIds.has(id)) next.add(id);
+    }
+    return next;
 }
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -224,7 +205,8 @@ function langFromPath(path: string): string {
     const base = path.split("/").pop() ?? "";
     const dot = base.lastIndexOf(".");
     if (dot < 0) return "";
-    return EXT_TO_LANG[base.slice(dot + 1).toLowerCase()] ?? "";
+    const extension = base.slice(dot + 1).toLowerCase();
+    return Object.hasOwn(EXT_TO_LANG, extension) ? (EXT_TO_LANG[extension] ?? "") : "";
 }
 
 function sideLabel(side: CommentSide, lineType: DiffComment["lineType"]): string {

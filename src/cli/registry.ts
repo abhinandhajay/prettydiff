@@ -80,4 +80,9 @@ export class HubRegistry {
         }
         return this.entries.get(repoId)?.repo.repoRoot ?? null;
     }
+
+    resolveRepo(repoId: string | undefined): RepoInfo | null {
+        const repoRoot = this.resolveRepoRoot(repoId);
+        return this.list().find((repo) => repo.repoRoot === repoRoot) ?? null;
+    }
 }

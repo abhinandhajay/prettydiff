@@ -14,6 +14,8 @@ A refined local web viewer for your Git changes. Run `prettydiff` inside any Git
 - Branch mode shows everything your current branch would introduce to a selected base branch (local or remote), like a PR diff, with a toggle for including uncommitted and untracked changes
 - File-tree sidebar with status indicators and addition/deletion counts
 - Inline comments on diff lines with edit/delete controls
+- Persistent comments shared between the browser and CLI
+- Agent-authored comments with visible attribution
 - Comments sidebar with jump-to-line navigation and AI-ready copy
 - Reload, line-wrap, and expand/collapse controls
 - Detects modified, added, deleted, renamed, and untracked files
@@ -53,6 +55,32 @@ Options:
 | `--help`, `-h`    | Print help and exit                                                   |
 
 `Ctrl-C` shuts down the server.
+
+## Shared comment CLI
+
+Agents and scripts can manage the same comments shown in the browser without starting a Pretty Diff server:
+
+```sh
+prettydiff comments list
+prettydiff comments add --file src/app.ts --side additions --line 42 \
+  --body "Handle the rejected promise." --author Codex
+prettydiff comments update --id <comment-id> --body "Handle both rejection paths."
+prettydiff comments delete --id <comment-id>
+```
+
+Commands use the Git repository containing the current directory. They default to the working-tree diff; pass `--target branch --target-ref <ref>` for a branch diff. Successful commands print JSON. Run `prettydiff comments --help` or any command with `--help` for its complete options.
+
+Comments are stored outside the repository in the operating system's application-data directory. Set `PRETTYDIFF_DATA_DIR` to override that location.
+
+## Agent skill
+
+The package includes a concise skill that teaches Codex and Claude how to operate the shared comment CLI:
+
+```sh
+prettydiff skill install
+```
+
+This installs `prettydiff-cli` for both agents. Pass `--agent codex` or `--agent claude` to install only one copy. Existing copies at the selected destinations are replaced. Run `prettydiff skill install --help` for destination details.
 
 prettydiff prints a one-line update notice on startup when a newer version is on npm. Set `PRETTYDIFF_NO_UPDATE_CHECK=1` to disable.
 
