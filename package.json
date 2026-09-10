@@ -1,6 +1,6 @@
 {
     "name": "@abhinandhajay/prettydiff",
-    "version": "0.7.1",
+    "version": "0.8.0",
     "description": "Open the working-tree diff of any git repo in a local web viewer.",
     "keywords": [
         "cli",

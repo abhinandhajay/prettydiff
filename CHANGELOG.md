@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-10
+
+### Added
+
+- Persistent review comments shared between the browser and CLI, with commands to list, add, update, and delete comments and visible attribution for agent-authored comments ([#17](https://github.com/abhinandhajay/prettydiff/pull/17)).
+
 ## [0.7.1] - 2026-07-14
 
 ### Fixed
@@ -101,6 +107,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 - Detects modified, added, deleted, renamed, and untracked files.
 - Flags: `--port <n>`, `--no-open`, `--version` / `-v`, `--help` / `-h`.
 
+[0.8.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.8.0
 [0.7.1]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.7.1
 [0.7.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.7.0
 [0.6.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.6.0
