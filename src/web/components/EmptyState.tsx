@@ -1,12 +1,15 @@
 import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 
+import type { ReactNode } from "react";
+
 interface Props {
     kind: "loading" | "error" | "empty";
     title: string;
     message?: string;
+    children?: ReactNode;
 }
 
-export function EmptyState({ kind, title, message }: Props) {
+export function EmptyState({ kind, title, message, children }: Props) {
     return (
         <div className="bg-background relative flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-hidden px-6 text-center">
             {kind === "loading" && (
@@ -38,6 +41,7 @@ export function EmptyState({ kind, title, message }: Props) {
                     </div>
                 ) : null}
             </div>
+            {children}
         </div>
     );
 }
