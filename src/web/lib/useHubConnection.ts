@@ -21,10 +21,17 @@ export function useHubConnection(
     });
 
     useEffect(() => {
+        if (status !== "reconnected") return;
+        const badgeTimer = window.setTimeout(() => {
+            setStatus("connected");
+        }, RECONNECTED_BADGE_MS);
+        return () => window.clearTimeout(badgeTimer);
+    }, [status]);
+
+    useEffect(() => {
         if (initialHubId === null) return;
         let disposed = false;
         let pollTimer: number | undefined;
-        let badgeTimer: number | undefined;
         let hubId = initialHubId;
         let failing = false;
 
@@ -47,10 +54,6 @@ export function useHubConnection(
                 if (failing) {
                     failing = false;
                     setStatus("reconnected");
-                    window.clearTimeout(badgeTimer);
-                    badgeTimer = window.setTimeout(() => {
-                        setStatus((s) => (s === "reconnected" ? "connected" : s));
-                    }, RECONNECTED_BADGE_MS);
                 }
                 if (changed) onHubChangedRef.current();
                 schedule(CONNECTED_POLL_MS);
@@ -73,7 +76,6 @@ export function useHubConnection(
         return () => {
             disposed = true;
             window.clearTimeout(pollTimer);
-            window.clearTimeout(badgeTimer);
             document.removeEventListener("visibilitychange", onVisibility);
         };
     }, [initialHubId]);
