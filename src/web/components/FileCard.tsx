@@ -56,7 +56,7 @@ function GutterAddButton({ onClick }: { onClick: () => void }) {
     );
 }
 
-type AnnotationMeta = { kind: "draft" } | { kind: "existing"; comment: DiffComment };
+type AnnotationMeta = { kind: "draft" } | { kind: "existing"; comments: DiffComment[] };
 
 interface Props {
     file: ParsedFile;
@@ -192,7 +192,7 @@ function FileCardImpl({
             annotations.push({
                 side: first.side,
                 lineNumber: first.lineNumber,
-                metadata: { kind: "existing", comment: first },
+                metadata: { kind: "existing", comments: group },
             });
         }
 
@@ -390,16 +390,23 @@ function FileCardImpl({
                                                         );
                                                     }
                                                     return (
-                                                        <CommentIndicator
-                                                            comment={a.metadata.comment}
-                                                            onEdit={onEditComment}
-                                                            onDelete={onDeleteComment}
-                                                            onFocusInSidebar={onFocusComment}
-                                                            flash={
-                                                                flashCommentId ===
-                                                                a.metadata.comment.id
-                                                            }
-                                                        />
+                                                        <>
+                                                            {a.metadata.comments.map((comment) => (
+                                                                <CommentIndicator
+                                                                    key={comment.id}
+                                                                    comment={comment}
+                                                                    onEdit={onEditComment}
+                                                                    onDelete={onDeleteComment}
+                                                                    onFocusInSidebar={
+                                                                        onFocusComment
+                                                                    }
+                                                                    flash={
+                                                                        flashCommentId ===
+                                                                        comment.id
+                                                                    }
+                                                                />
+                                                            ))}
+                                                        </>
                                                     );
                                                 }}
                                                 renderGutterUtility={(getHover) =>
