@@ -276,6 +276,34 @@ describe("getDiffPayload — working tree", () => {
         TIMEOUT,
     );
 
+    test.each(["absent", "target.txt", "large.txt", "directory", "two\nlines", "trailing\n"])(
+        "untracked symlink to %s uses the link target as contents and size",
+        async (target) => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "target.txt", "file contents\n");
+            await commitFile(repo, "large.txt", "x".repeat(513 * 1024));
+            await commitFile(repo, "directory/child.txt", "directory contents\n");
+            await symlink(target, path.join(repo, "link"));
+
+            expect(await runGit(repo, "ls-files", "--others", "--exclude-standard")).toBe("link");
+            const payload = await getDiffPayload(repo);
+            expect(payload!.files).toHaveLength(1);
+            const file = fileByPath(payload!.files, "link");
+            expect(file.status).toBe("untracked");
+            expect(file.skipped).toBeUndefined();
+            expect(file.additions).toBe(target.trimEnd().split("\n").length);
+            expect(file.deletions).toBe(0);
+            expect(file.rawPatch).toContain("new file mode 120000");
+            expect(file.rawPatch).toContain(`+${target.trimEnd().split("\n").join("\n+")}\n`);
+            expect(file.rawPatch.includes("\\ No newline at end of file")).toBe(
+                !target.endsWith("\n"),
+            );
+            expect(file.oldContents).toBe("");
+            expect(file.newContents).toBe(target);
+        },
+        TIMEOUT,
+    );
+
     test(
         "empty untracked file is included as no-hunks",
         async () => {

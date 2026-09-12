@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { lstat, readFile, readlink, realpath, stat } from "node:fs/promises";
+import { lstat, readFile, readlink, realpath } from "node:fs/promises";
 import path from "node:path";
 
 import parseDiffLib from "parse-diff";
@@ -256,7 +256,27 @@ async function synthesizeUntrackedPatch(
     const abs = path.join(cwd, relPath);
     let size = 0;
     try {
-        const s = await stat(abs);
+        const s = await lstat(abs);
+        if (s.isSymbolicLink()) {
+            // git diff --no-index can treat a directory symlink as a directory.
+            const target = await readlink(abs, "utf8");
+            const lines = target.split("\n");
+            if (target.endsWith("\n")) lines.pop();
+            return {
+                patch: normalizeLineEndings(
+                    [
+                        `diff --git a/${relPath} b/${relPath}`,
+                        "new file mode 120000",
+                        "--- /dev/null",
+                        `+++ b/${relPath}`,
+                        `@@ -0,0 +1,${lines.length} @@`,
+                        ...lines.map((line) => `+${line}`),
+                        ...(target.endsWith("\n") ? [] : ["\\ No newline at end of file"]),
+                        "",
+                    ].join("\n"),
+                ),
+            };
+        }
         size = s.size;
     } catch {
         return { patch: "" };
