@@ -76,6 +76,55 @@ describe("getRepoRoot", () => {
 
 describe("getDiffPayload — working tree", () => {
     test(
+        "empty unborn repo produces an empty working-tree payload",
+        async () => {
+            const repo = await trackedRepo();
+            const payload = await getDiffPayload(repo);
+            expect(payload).toEqual(
+                expect.objectContaining({ head: "", target: "working-tree", files: [] }),
+            );
+        },
+        TIMEOUT,
+    );
+
+    test.each(["sha1", "sha256"])(
+        "unborn %s repo includes staged and untracked files in full and comment lookups",
+        async (objectFormat) => {
+            const repo = await makeTmpDir();
+            dirs.push(repo);
+            await runGit(repo, "init", "-b", "main", `--object-format=${objectFormat}`);
+            await writeRepoFile(repo, "staged.txt", "staged\n");
+            await runGit(repo, "add", "staged.txt");
+            await writeRepoFile(repo, "staged.txt", "staged\nworking tree edit\n");
+            await writeRepoFile(repo, "a.txt", "untracked\n");
+
+            const payload = await getDiffPayload(repo);
+            expect(payload!.head).toBe("");
+            expect(payload!.files.map((file) => file.path).sort()).toEqual(["a.txt", "staged.txt"]);
+            for (const [filePath, status, contents] of [
+                ["staged.txt", "added", "staged\nworking tree edit\n"],
+                ["a.txt", "untracked", "untracked\n"],
+            ]) {
+                const expected = fileByPath(payload!.files, filePath);
+                expect(expected).toEqual(
+                    expect.objectContaining({ status, oldContents: "", newContents: contents }),
+                );
+                expect(expected.rawPatch).toContain(`+${contents.trim().split("\n").join("\n+")}`);
+                const single = await getDiffFile(repo, filePath);
+                const filtered = (await getDiffPayloadForFiles(repo, [filePath]))!.files;
+                expect(filtered).toHaveLength(1);
+                for (const file of [single, filtered[0]]) {
+                    expect(file).toEqual({ ...expected, rawPatch: expect.any(String) });
+                    expect(file!.rawPatch.trim()).toBe(expected.rawPatch.trim());
+                }
+            }
+            expect(await getDiffFile(repo, "missing.txt")).toBeUndefined();
+            expect((await getDiffPayloadForFiles(repo, []))!.files).toEqual([]);
+        },
+        TIMEOUT,
+    );
+
+    test(
         "clean repo produces an empty payload with repo metadata",
         async () => {
             const repo = await trackedRepo();

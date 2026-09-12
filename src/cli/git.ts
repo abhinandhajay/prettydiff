@@ -411,14 +411,21 @@ async function buildDiffPayload(
     const target = requestedOptions.target ?? "working-tree";
     const [branch, head] = await Promise.all([
         minimalMetadata && target !== "branch" ? Promise.resolve("") : getBranch(repoRoot),
-        minimalMetadata ? Promise.resolve("") : getHead(repoRoot),
+        getHead(repoRoot),
     ]);
     const targetRef =
         target === "branch"
             ? await resolveTargetRef(repoRoot, requestedOptions.targetRef, branch)
             : undefined;
     const mergeBase = targetRef ? await resolveMergeBase(repoRoot, targetRef) : null;
-    const baseRef = target === "branch" ? (mergeBase ?? targetRef ?? "HEAD") : "HEAD";
+    const baseRef =
+        target === "branch"
+            ? (mergeBase ?? targetRef ?? "HEAD")
+            : head
+              ? "HEAD"
+              : (
+                    await run("git", ["hash-object", "-t", "tree", "--stdin"], repoRoot)
+                ).stdout.trim();
     const includeWorkingTree = target !== "branch" || (requestedOptions.includeWorkingTree ?? true);
     const newRef = includeWorkingTree ? null : "HEAD";
     const hasPathFilter = filePaths !== undefined;
