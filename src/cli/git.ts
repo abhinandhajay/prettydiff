@@ -267,10 +267,10 @@ async function synthesizeUntrackedPatch(
         // marks it too-large and clears the patch before serving.
         const kb = Math.round(size / 1024);
         const patch = [
-            `diff --git a/${relPath} b/${relPath}`,
+            `diff --git ${quoteGitPath(`a/${relPath}`)} ${quoteGitPath(`b/${relPath}`)}`,
             `new file mode 100644`,
             `--- /dev/null`,
-            `+++ b/${relPath}`,
+            `+++ ${quoteGitPath(`b/${relPath}`)}`,
             `@@ -0,0 +1,1 @@`,
             `+[prettydiff: file skipped — ${kb} KB exceeds 512 KB limit]`,
             "",
@@ -286,21 +286,7 @@ async function synthesizeUntrackedPatch(
     );
     if (!r.stdout) return { patch: "" };
 
-    return {
-        patch: normalizeLineEndings(
-            r.stdout.replace(
-                new RegExp(
-                    `^diff --git a/${escapeRegex(NULL_DEVICE)} b/${escapeRegex(relPath)}`,
-                    "m",
-                ),
-                `diff --git a/${relPath} b/${relPath}`,
-            ),
-        ),
-    };
-}
-
-function escapeRegex(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return { patch: normalizeLineEndings(r.stdout) };
 }
 
 function splitCombinedPatch(combined: string): string[] {
@@ -309,10 +295,79 @@ function splitCombinedPatch(combined: string): string[] {
     return parts.filter((p) => p.trim().length > 0);
 }
 
+function quoteGitPath(value: string): string {
+    const quoted = [...value]
+        .map((char) => {
+            const code = char.charCodeAt(0);
+            return code < 32 || code === 127 || char === '"' || char === "\\"
+                ? `\\${code.toString(8).padStart(3, "0")}`
+                : char;
+        })
+        .join("");
+    return `"${quoted}"`;
+}
+
+function decodeGitPath(value: string): string {
+    if (!value.startsWith('"') || !value.endsWith('"')) return value;
+    const escapes: Record<string, string> = {
+        a: "\x07",
+        b: "\b",
+        t: "\t",
+        n: "\n",
+        v: "\v",
+        f: "\f",
+        r: "\r",
+        '"': '"',
+        "\\": "\\",
+    };
+    // Octal escapes encode bytes, including multi-byte UTF-8 characters.
+    const bytes: Buffer[] = [];
+    const contents = value.slice(1, -1);
+    let start = 0;
+    for (const match of contents.matchAll(/\\([0-7]{3}|[abtnvfr"\\])/g)) {
+        bytes.push(Buffer.from(contents.slice(start, match.index)));
+        bytes.push(
+            /^[0-7]/.test(match[1])
+                ? Buffer.from([parseInt(match[1], 8)])
+                : Buffer.from(escapes[match[1]]),
+        );
+        start = match.index + match[0].length;
+    }
+    bytes.push(Buffer.from(contents.slice(start)));
+    return Buffer.concat(bytes).toString("utf8");
+}
+
+function parseGitPatch(block: string): parseDiffLib.File[] {
+    const parsed = parseDiffLib(block);
+    // parse-diff strips quotes and whitespace before callers can decode them.
+    const lines = block.split("\n");
+    const header = /^diff --git ("(?:\\.|[^"\\])*"|a\/.*?) ("(?:\\.|[^"\\])*"|b\/.*)$/.exec(
+        lines[0],
+    );
+    let from = header ? decodeGitPath(header[1]).replace(/^a\//, "") : undefined;
+    let to = header ? decodeGitPath(header[2]).replace(/^b\//, "") : undefined;
+    for (const line of lines.slice(1)) {
+        if (line.startsWith("@@")) break;
+        if (line.startsWith("--- "))
+            from = decodeGitPath(line.slice(4).replace(/\t.*$/, "")).replace(/^a\//, "");
+        if (line.startsWith("+++ "))
+            to = decodeGitPath(line.slice(4).replace(/\t.*$/, "")).replace(/^b\//, "");
+        if (line.startsWith("rename from ")) from = decodeGitPath(line.slice(12));
+        if (line.startsWith("rename to ")) to = decodeGitPath(line.slice(10));
+        if (line.startsWith("copy from ")) from = decodeGitPath(line.slice(10));
+        if (line.startsWith("copy to ")) to = decodeGitPath(line.slice(8));
+    }
+    for (const file of parsed) {
+        if (from !== undefined) file.from = from;
+        if (to !== undefined) file.to = to;
+    }
+    return parsed;
+}
+
 function getPatchPaths(patch: string): Set<string> {
     const paths = new Set<string>();
     for (const block of splitCombinedPatch(patch)) {
-        for (const parsed of parseDiffLib(block)) {
+        for (const parsed of parseGitPatch(block)) {
             const { path: filePath, oldPath } = normalizePath(parsed);
             paths.add(filePath);
             if (oldPath) paths.add(oldPath);
@@ -463,7 +518,7 @@ async function buildDiffPayload(
 
     const files: ParsedFile[] = [];
     for (const block of fileBlocks) {
-        const parsedArr = parseDiffLib(block);
+        const parsedArr = parseGitPatch(block);
         const isBinary = /^Binary files .* differ$/m.test(block);
         for (const p of parsedArr) {
             const { path: filePath, oldPath } = normalizePath(p);
