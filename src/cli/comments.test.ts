@@ -5,6 +5,7 @@ import {
     commitFile,
     makeRepo,
     makeTmpDir,
+    runGit,
     writeRepoFile,
 } from "../../test/helpers/tmpRepo";
 
@@ -87,6 +88,49 @@ describe("comments help", () => {
 });
 
 describe("comments commands", () => {
+    test("adds and checks comments before the first commit", async () => {
+        const unborn = await makeRepo();
+        dirs.push(unborn);
+        await writeRepoFile(unborn, "staged.txt", "staged\n");
+        await runGit(unborn, "add", "staged.txt");
+        await writeRepoFile(unborn, "a.txt", "untracked\n");
+        const command = async (argv: string[]) => {
+            let stdout = "";
+            let stderr = "";
+            const code = await runCommentsCommand(argv, {
+                cwd: unborn,
+                commentStore: store,
+                stdout: (text) => (stdout += text),
+                stderr: (text) => (stderr += text),
+            });
+            expect({ code, stderr }).toEqual({ code: 0, stderr: "" });
+            return JSON.parse(stdout);
+        };
+
+        for (const file of ["staged.txt", "a.txt"]) {
+            const added = await command([
+                "add",
+                "--file",
+                file,
+                "--side",
+                "additions",
+                "--line",
+                "1",
+                "--body",
+                "Review",
+            ]);
+            expect(added.comment.filePath).toBe(file);
+        }
+        const listed = await command(["list"]);
+        for (const file of ["staged.txt", "a.txt"]) {
+            expect(listed.comments[file][0].stale).toBeUndefined();
+        }
+        await writeRepoFile(unborn, "a.txt", "changed\n");
+        const changed = await command(["list"]);
+        expect(changed.comments["a.txt"][0].stale).toBe(true);
+        expect(changed.comments["staged.txt"][0].stale).toBeUndefined();
+    });
+
     test.each([
         { lineArgs: ["--line"] },
         { lineArgs: ["--line", "--body", "note"] },
