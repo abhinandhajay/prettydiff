@@ -195,6 +195,88 @@ describe("getDiffPayload — working tree", () => {
     );
 
     test(
+        "handles untracked filenames beginning with a dash",
+        async () => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "a.txt", "before\n");
+            await writeRepoFile(repo, "a.txt", "after\n");
+            await writeRepoFile(repo, "-test.txt", "new file\n");
+
+            const payload = await getDiffPayload(repo);
+            expect(payload!.files.map((file) => file.path).sort()).toEqual(["-test.txt", "a.txt"]);
+            for (const file of [
+                fileByPath(payload!.files, "-test.txt"),
+                await getDiffFile(repo, "-test.txt"),
+                fileByPath((await getDiffPayloadForFiles(repo, ["-test.txt"]))!.files, "-test.txt"),
+            ]) {
+                expect(file).toEqual(
+                    expect.objectContaining({
+                        path: "-test.txt",
+                        status: "untracked",
+                        oldContents: "",
+                        newContents: "new file\n",
+                    }),
+                );
+                expect(file!.rawPatch).toContain("+new file");
+            }
+        },
+        TIMEOUT,
+    );
+
+    test(
+        "separates HEAD revisions from tracked paths in full and filtered diffs",
+        async () => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "HEAD", "before\n");
+            await commitFile(repo, "old[1].txt", "line1\nline2\nline3\nline4\n");
+            await runGit(repo, "checkout", "-b", "feature");
+            await runGit(repo, "mv", "old[1].txt", "new[1].txt");
+            await writeRepoFile(repo, "new[1].txt", "line1\nchanged\nline3\nline4\n");
+            await writeRepoFile(repo, "HEAD", "committed\n");
+            await runGit(repo, "add", "--", "HEAD", "new[1].txt");
+            await runGit(repo, "commit", "-m", "change files");
+            await writeRepoFile(repo, "HEAD", "working tree\n");
+            await writeRepoFile(repo, "new1.txt", "unrelated\n");
+
+            const working = await getDiffPayload(repo);
+            expect(fileByPath(working!.files, "HEAD").newContents).toBe("working tree\n");
+            expect((await getDiffFile(repo, "HEAD"))!.oldContents).toBe("committed\n");
+            for (const includeWorkingTree of [false, true]) {
+                const options = {
+                    target: "branch" as const,
+                    targetRef: "main",
+                    includeWorkingTree,
+                };
+                const payload = await getDiffPayload(repo, options);
+                const head = fileByPath(payload!.files, "HEAD");
+                expect(head.oldContents).toBe("before\n");
+                expect(head.newContents).toBe(
+                    includeWorkingTree ? "working tree\n" : "committed\n",
+                );
+                const filtered = (await getDiffPayloadForFiles(repo, ["new[1].txt"], options))!;
+                expect(filtered.files).toHaveLength(1);
+                for (const file of [
+                    await getDiffFile(repo, "new[1].txt", options),
+                    filtered.files[0],
+                ]) {
+                    expect(file).toEqual(
+                        expect.objectContaining({
+                            path: "new[1].txt",
+                            oldPath: "old[1].txt",
+                            status: "renamed",
+                            oldContents: "line1\nline2\nline3\nline4\n",
+                            newContents: "line1\nchanged\nline3\nline4\n",
+                        }),
+                    );
+                    expect(file!.rawPatch).toContain("-line2");
+                    expect(file!.rawPatch).toContain("+changed");
+                }
+            }
+        },
+        TIMEOUT,
+    );
+
+    test(
         "staged new file is added",
         async () => {
             const repo = await trackedRepo();
