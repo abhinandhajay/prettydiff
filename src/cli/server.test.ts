@@ -61,6 +61,74 @@ async function withServer(
     }
 }
 
+describe("Host validation", () => {
+    const routes = [
+        "/api/diff",
+        "/api/comments",
+        "/api/hub/repos",
+        "/api/hub",
+        "/",
+        "/assets/app.js",
+    ];
+
+    test("rejects foreign, missing, and malformed Hosts before serving reads", async () => {
+        await withServer(
+            repo,
+            async (srv) => {
+                for (const host of [
+                    "attacker.example",
+                    `attacker.example:${srv.port}`,
+                    "",
+                    "localhost.attacker.example",
+                    "127.0.0.1.attacker.example",
+                    "localhost@attacker.example",
+                    "localhost:invalid",
+                    "localhost:80:90",
+                    "[::1].attacker.example",
+                    "::1",
+                ]) {
+                    for (const route of routes) {
+                        const res = await fetch(srv.url + route, { headers: { host } });
+                        // The HTTP adapter may reject malformed authorities before middleware runs.
+                        expect([400, 403]).toContain(res.status);
+                        if (res.status === 403) {
+                            expect(await res.json()).toEqual({ error: "forbidden" });
+                        } else {
+                            const body = await res.text();
+                            expect(body).not.toContain(repo);
+                            expect(body).not.toContain("newContents");
+                        }
+                    }
+                }
+                const head = await fetch(`${srv.url}/api/diff`, {
+                    method: "HEAD",
+                    headers: { host: "attacker.example" },
+                });
+                expect(head.status).toBe(403);
+            },
+            webRoot,
+        );
+    });
+
+    test("allows local Hosts with and without ephemeral ports, without requiring JSON", async () => {
+        await withServer(
+            repo,
+            async (srv) => {
+                for (const hostname of ["localhost", "LOCALHOST", "127.0.0.1", "[::1]"]) {
+                    for (const host of [hostname, `${hostname}:${srv.port}`]) {
+                        for (const route of routes) {
+                            const res = await fetch(srv.url + route, { headers: { host } });
+                            expect(res.status).toBe(200);
+                            await res.text();
+                        }
+                    }
+                }
+            },
+            webRoot,
+        );
+    });
+});
+
 describe("GET /api/diff", () => {
     test("returns the diff payload", async () => {
         await withServer(repo, async (srv) => {
