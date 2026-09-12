@@ -1,6 +1,9 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
+import * as childProcess from "node:child_process";
+import { EventEmitter } from "node:events";
 import { mkdir, realpath, rm, symlink } from "node:fs/promises";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 
 import {
     cleanupDir,
@@ -36,6 +39,29 @@ function fileByPath(files: ParsedFile[], p: string): ParsedFile {
 }
 
 describe("getRepoRoot", () => {
+    test("preserves UTF-8 characters split at every byte boundary", async () => {
+        const root = "/tmp/repo-¢-€-😀";
+        const bytes = Buffer.from(`${root}\n`);
+        for (let split = 1; split < bytes.length; split++) {
+            const stdout = new PassThrough();
+            const stderr = new PassThrough();
+            const child = Object.assign(new EventEmitter(), { stdout, stderr });
+            const spawn = spyOn(childProcess, "spawn").mockImplementation(
+                (() => child) as unknown as typeof childProcess.spawn,
+            );
+            try {
+                const result = getRepoRoot("/tmp");
+                stdout.write(bytes.subarray(0, split));
+                stdout.end(bytes.subarray(split));
+                stderr.end();
+                child.emit("close", 0);
+                expect(await result).toBe(root);
+            } finally {
+                spawn.mockRestore();
+            }
+        }
+    });
+
     let repo: string;
     let repoReal: string;
 
@@ -75,6 +101,25 @@ describe("getRepoRoot", () => {
 });
 
 describe("getDiffPayload — working tree", () => {
+    test(
+        "preserves large UTF-8 contents and patches from Git",
+        async () => {
+            const repo = await trackedRepo();
+            const original = `${"€".repeat(50_000)}\n`;
+            const modified = `${original}end\n`;
+            await commitFile(repo, "a.txt", original);
+            await writeRepoFile(repo, "a.txt", modified);
+            const payload = await getDiffPayload(repo);
+            const file = fileByPath(payload!.files, "a.txt");
+            expect(file.oldContents === original).toBe(true);
+            expect(file.oldContents?.length).toBe(50_001);
+            expect(file.newContents === modified).toBe(true);
+            expect(file.rawPatch.includes(original)).toBe(true);
+            expect(file.rawPatch).not.toContain("\uFFFD");
+        },
+        TIMEOUT,
+    );
+
     test(
         "clean repo produces an empty payload with repo metadata",
         async () => {
