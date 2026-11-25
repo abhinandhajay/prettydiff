@@ -26,8 +26,10 @@ function run(
         const child = spawn(cmd, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
         let stdout = "";
         let stderr = "";
-        child.stdout.on("data", (b: Buffer) => (stdout += b.toString("utf8")));
-        child.stderr.on("data", (b: Buffer) => (stderr += b.toString("utf8")));
+        child.stdout.setEncoding("utf8");
+        child.stderr.setEncoding("utf8");
+        child.stdout.on("data", (chunk: string) => (stdout += chunk));
+        child.stderr.on("data", (chunk: string) => (stderr += chunk));
         child.on("error", reject);
         child.on("close", (code: number | null) => {
             const c = code ?? 0;
