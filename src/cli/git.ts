@@ -139,7 +139,8 @@ async function getTrackedDiff(
             "--ignore-cr-at-eol",
             "--src-prefix=a/",
             "--dst-prefix=b/",
-            ...(filePaths ? ["--", ...filePaths] : []),
+            "--",
+            ...(filePaths ?? []),
         ],
         cwd,
     );
@@ -155,7 +156,15 @@ async function includeRenamePairs(
     const requestedPaths = new Set(filePaths);
     const r = await run(
         "git",
-        ["diff", baseRef, ...(newRef ? [newRef] : []), "--name-status", "-z", "--find-renames"],
+        [
+            "diff",
+            baseRef,
+            ...(newRef ? [newRef] : []),
+            "--name-status",
+            "-z",
+            "--find-renames",
+            "--",
+        ],
         cwd,
     );
     const fields = r.stdout.split("\0");
@@ -288,7 +297,7 @@ async function synthesizeUntrackedPatch(
 
     const r = await run(
         "git",
-        ["diff", "--no-index", "--no-color", "--no-ext-diff", NULL_DEVICE, relPath],
+        ["diff", "--no-index", "--no-color", "--no-ext-diff", "--", NULL_DEVICE, relPath],
         cwd,
         [0, 1],
     );
