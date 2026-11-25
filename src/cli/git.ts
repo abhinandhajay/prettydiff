@@ -265,10 +265,10 @@ async function synthesizeUntrackedPatch(
             return {
                 patch: normalizeLineEndings(
                     [
-                        `diff --git a/${relPath} b/${relPath}`,
+                        `diff --git ${quoteGitPath(`a/${relPath}`)} ${quoteGitPath(`b/${relPath}`)}`,
                         "new file mode 120000",
                         "--- /dev/null",
-                        `+++ b/${relPath}`,
+                        `+++ ${quoteGitPath(`b/${relPath}`)}`,
                         `@@ -0,0 +1,${lines.length} @@`,
                         ...lines.map((line) => `+${line}`),
                         ...(target.endsWith("\n") ? [] : ["\\ No newline at end of file"]),

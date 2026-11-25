@@ -415,6 +415,29 @@ describe("getDiffPayload — working tree", () => {
         TIMEOUT,
     );
 
+    test.each(["tab\tlink", "line\nlink", 'quote"link', "back\\slash", "café link"])(
+        "untracked symlink named %j keeps its path",
+        async (name) => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "target.txt", "file contents\n");
+            await symlink("target.txt", path.join(repo, name));
+
+            const payload = await getDiffPayload(repo);
+            expect(payload!.files.map((file) => file.path)).toEqual([name]);
+            for (const file of [payload!.files[0], await getDiffFile(repo, name)]) {
+                expect(file).toMatchObject({
+                    path: name,
+                    status: "untracked",
+                    additions: 1,
+                    oldContents: "",
+                    newContents: "target.txt",
+                });
+                expect(file!.rawPatch).toContain("new file mode 120000");
+            }
+        },
+        TIMEOUT,
+    );
+
     test(
         "empty untracked file is included as no-hunks",
         async () => {
