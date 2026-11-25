@@ -15,6 +15,7 @@ import {
 } from "../../test/helpers/tmpRepo";
 
 import { getDiffFile, getDiffPayload, getDiffPayloadForFiles, getRepoRoot } from "./git.js";
+import { createValidatedComment } from "./review.js";
 
 import type { ParsedFile } from "./types.js";
 
@@ -75,6 +76,116 @@ describe("getRepoRoot", () => {
         },
         TIMEOUT,
     );
+});
+
+describe("Git-quoted paths", () => {
+    const names = [
+        "café.txt",
+        "tab\tname.txt",
+        'quote".txt',
+        "back\\slash.txt",
+        "line\nname.txt",
+        "control\x07\b\f\r\v.txt",
+        "apostrophe'.txt",
+        "trailing space ",
+        'ends"',
+        "ends'",
+        "literal\\303.txt",
+    ];
+
+    test(
+        "quoted paths survive no-hunk, binary, added, deleted, and committed diffs",
+        async () => {
+            const repo = await trackedRepo();
+            const name = 'café\t"\\.txt';
+            await commitFile(repo, name, "old\n");
+            await runGit(repo, "mv", "--", name, `renamed-${name}`);
+            expect(await getDiffFile(repo, `renamed-${name}`)).toMatchObject({
+                oldPath: name,
+                status: "renamed",
+                skipped: { reason: "no-hunks" },
+            });
+            await runGit(repo, "commit", "-am", "rename");
+            await runGit(repo, "rm", "--", `renamed-${name}`);
+            expect(await getDiffFile(repo, `renamed-${name}`)).toMatchObject({
+                status: "deleted",
+                oldContents: "old\n",
+                newContents: "",
+            });
+            await writeRepoFile(repo, name, "new\n");
+            await runGit(repo, "add", "--", name);
+            expect(await getDiffFile(repo, name)).toMatchObject({
+                status: "added",
+                newContents: "new\n",
+            });
+            await runGit(repo, "commit", "-am", "replace");
+            expect(
+                await getDiffFile(repo, name, {
+                    target: "branch",
+                    targetRef: "HEAD~1",
+                    includeWorkingTree: false,
+                }),
+            ).toMatchObject({ path: name, newContents: "new\n" });
+            await writeRepoFile(repo, name, new Uint8Array([0, 1, 2]));
+            expect(await getDiffFile(repo, name)).toMatchObject({ path: name, binary: true });
+            await runGit(repo, "config", "core.quotePath", "false");
+            expect(await getDiffFile(repo, name)).toMatchObject({ path: name, binary: true });
+        },
+        TIMEOUT,
+    );
+
+    for (const name of names) {
+        test(
+            `round-trips ${JSON.stringify(name)} through tracked, untracked, and rename lookups`,
+            async () => {
+                const repo = await trackedRepo();
+                await runGit(repo, "config", "core.quotePath", "true");
+                await commitFile(repo, name, "one\ntwo\nthree\nfour\nfive\n");
+                await writeRepoFile(repo, name, "one\nchanged\nthree\nfour\nfive\n");
+                const file = fileByPath((await getDiffPayload(repo))!.files, name);
+                expect(file.status).toBe("modified");
+                expect(file.oldContents).toBe("one\ntwo\nthree\nfour\nfive\n");
+                expect(file.newContents).toBe("one\nchanged\nthree\nfour\nfive\n");
+                expect(await getDiffFile(repo, name)).toEqual(file);
+
+                const renamed = `new-${name}`;
+                await runGit(repo, "mv", "--", name, renamed);
+                const rename = await getDiffFile(repo, renamed);
+                expect(rename).toMatchObject({
+                    path: renamed,
+                    oldPath: name,
+                    status: "renamed",
+                    oldContents: file.oldContents,
+                    newContents: file.newContents,
+                });
+                expect((await getDiffPayloadForFiles(repo, [name]))!.files).toEqual([rename!]);
+                const comment = createValidatedComment(rename, {
+                    filePath: renamed,
+                    side: "deletions",
+                    lineNumber: 2,
+                    body: "review",
+                    author: { kind: "agent" },
+                });
+                expect(comment.lineText).toBe("two");
+
+                const untrackedName = `untracked-${name}`;
+                await writeRepoFile(repo, untrackedName, "untracked\n");
+                expect(await getDiffFile(repo, untrackedName)).toMatchObject({
+                    path: untrackedName,
+                    status: "untracked",
+                    oldContents: "",
+                    newContents: "untracked\n",
+                });
+                await writeRepoFile(repo, untrackedName, "x".repeat(513 * 1024));
+                expect(await getDiffFile(repo, untrackedName)).toMatchObject({
+                    path: untrackedName,
+                    status: "untracked",
+                    skipped: { reason: "too-large" },
+                });
+            },
+            TIMEOUT,
+        );
+    }
 });
 
 describe("getDiffPayload — working tree", () => {
@@ -417,6 +528,57 @@ describe("getDiffPayload — working tree", () => {
             expect(file.rawPatch).toContain("+remember");
             expect(file.oldContents).toBe("");
             expect(file.newContents).toBe("remember\n");
+        },
+        TIMEOUT,
+    );
+
+    test.each(["absent", "target.txt", "large.txt", "directory", "two\nlines", "trailing\n"])(
+        "untracked symlink to %s uses the link target as contents and size",
+        async (target) => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "target.txt", "file contents\n");
+            await commitFile(repo, "large.txt", "x".repeat(513 * 1024));
+            await commitFile(repo, "directory/child.txt", "directory contents\n");
+            await symlink(target, path.join(repo, "link"));
+
+            expect(await runGit(repo, "ls-files", "--others", "--exclude-standard")).toBe("link");
+            const payload = await getDiffPayload(repo);
+            expect(payload!.files).toHaveLength(1);
+            const file = fileByPath(payload!.files, "link");
+            expect(file.status).toBe("untracked");
+            expect(file.skipped).toBeUndefined();
+            expect(file.additions).toBe(target.trimEnd().split("\n").length);
+            expect(file.deletions).toBe(0);
+            expect(file.rawPatch).toContain("new file mode 120000");
+            expect(file.rawPatch).toContain(`+${target.trimEnd().split("\n").join("\n+")}\n`);
+            expect(file.rawPatch.includes("\\ No newline at end of file")).toBe(
+                !target.endsWith("\n"),
+            );
+            expect(file.oldContents).toBe("");
+            expect(file.newContents).toBe(target);
+        },
+        TIMEOUT,
+    );
+
+    test.each(["tab\tlink", "line\nlink", 'quote"link', "back\\slash", "café link"])(
+        "untracked symlink named %j keeps its path",
+        async (name) => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "target.txt", "file contents\n");
+            await symlink("target.txt", path.join(repo, name));
+
+            const payload = await getDiffPayload(repo);
+            expect(payload!.files.map((file) => file.path)).toEqual([name]);
+            for (const file of [payload!.files[0], await getDiffFile(repo, name)]) {
+                expect(file).toMatchObject({
+                    path: name,
+                    status: "untracked",
+                    additions: 1,
+                    oldContents: "",
+                    newContents: "target.txt",
+                });
+                expect(file!.rawPatch).toContain("new file mode 120000");
+            }
         },
         TIMEOUT,
     );
