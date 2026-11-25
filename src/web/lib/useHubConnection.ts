@@ -23,7 +23,8 @@ export function useHubConnection(
     useEffect(() => {
         if (status !== "reconnected") return;
         const badgeTimer = window.setTimeout(() => {
-            setStatus("connected");
+            // A failed poll can queue "reconnecting" before this effect is cleaned up.
+            setStatus((s) => (s === "reconnected" ? "connected" : s));
         }, RECONNECTED_BADGE_MS);
         return () => window.clearTimeout(badgeTimer);
     }, [status]);

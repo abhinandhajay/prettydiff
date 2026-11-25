@@ -108,6 +108,27 @@ test("a second outage cancels the old badge and gives recovery a full badge dura
     expect(timers.size).toBe(0);
 });
 
+test("an expiring badge does not hide an outage queued in the same update batch", async () => {
+    const { result, unmount } = renderHook(() => useHubConnection("old", () => {}));
+    failing = true;
+    await advance(5000);
+    failing = false;
+    await advance(1000);
+    expect(result.current).toBe("reconnected");
+    const badge = [...timers.entries()].find(([, timer]) => timer.at === now + 3000);
+    expect(badge).toBeDefined();
+    failing = true;
+    await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+        await Promise.resolve();
+        await Promise.resolve();
+        timers.delete(badge![0]);
+        badge![1].callback();
+    });
+    expect(result.current).toBe("reconnecting");
+    unmount();
+});
+
 test("unmount cancels the active reconnect badge and polling timer", async () => {
     const { result, unmount } = renderHook(() => useHubConnection("old", () => {}));
     failing = true;
