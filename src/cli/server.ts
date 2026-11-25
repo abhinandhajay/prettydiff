@@ -52,13 +52,7 @@ export interface ServerOptions {
     webRoot?: string;
 }
 
-// Loopback-only CSRF posture: mutating routes require a local Host (defeats DNS
-// rebinding) and a JSON content type (forces a preflight no CORS headers answer).
-function rejectNonLocalMutation(c: Context): Response | null {
-    const hostname = (c.req.header("host") ?? "").replace(/:\d+$/, "");
-    if (hostname !== "127.0.0.1" && hostname !== "localhost" && hostname !== "[::1]") {
-        return c.json({ error: "forbidden" }, 403);
-    }
+function rejectNonJsonMutation(c: Context): Response | null {
     if (!(c.req.header("content-type") ?? "").includes("application/json")) {
         return c.json({ error: "expected application/json" }, 415);
     }
@@ -116,6 +110,15 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
     const comments = options.commentStore ?? new CommentStore();
     const app = new Hono();
 
+    // Validate every request to prevent DNS rebinding from exposing repository data.
+    app.use("*", async (c, next) => {
+        const host = c.req.header("host") ?? "";
+        if (!/^(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]+)?$/i.test(host)) {
+            return c.json({ error: "forbidden" }, 403);
+        }
+        await next();
+    });
+
     app.get("/api/hub", (c) => {
         return c.json({ app: "prettydiff", version, hubId } satisfies HubIdentity);
     });
@@ -131,7 +134,7 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
     });
 
     app.post("/api/hub/register", async (c) => {
-        const rejected = rejectNonLocalMutation(c);
+        const rejected = rejectNonJsonMutation(c);
         if (rejected) return rejected;
         const body = await readJson<RegisterRequest>(c);
         if (typeof body?.repoRoot !== "string" || typeof body.clientId !== "string") {
@@ -144,7 +147,7 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
     });
 
     app.post("/api/hub/heartbeat", async (c) => {
-        const rejected = rejectNonLocalMutation(c);
+        const rejected = rejectNonJsonMutation(c);
         if (rejected) return rejected;
         const body = await readJson<HeartbeatRequest>(c);
         if (typeof body?.repoId !== "string" || typeof body.clientId !== "string") {
@@ -157,7 +160,7 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
     });
 
     app.post("/api/hub/unregister", async (c) => {
-        const rejected = rejectNonLocalMutation(c);
+        const rejected = rejectNonJsonMutation(c);
         if (rejected) return rejected;
         const body = await readJson<UnregisterRequest>(c);
         if (typeof body?.repoId !== "string" || typeof body.clientId !== "string") {
@@ -210,7 +213,7 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
     });
 
     app.post("/api/comments/import", async (c) => {
-        const rejected = rejectNonLocalMutation(c);
+        const rejected = rejectNonJsonMutation(c);
         if (rejected) return rejected;
         const repo = registry.resolveRepo(c.req.query("repo"));
         if (!repo) return c.json({ error: "unknown repo" }, 404);
@@ -226,7 +229,7 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
     });
 
     app.post("/api/comments", async (c) => {
-        const rejected = rejectNonLocalMutation(c);
+        const rejected = rejectNonJsonMutation(c);
         if (rejected) return rejected;
         const body = await readJson<{
             id?: string;
@@ -268,7 +271,7 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
     });
 
     app.patch("/api/comments/:id", async (c) => {
-        const rejected = rejectNonLocalMutation(c);
+        const rejected = rejectNonJsonMutation(c);
         if (rejected) return rejected;
         const repo = registry.resolveRepo(c.req.query("repo"));
         if (!repo) return c.json({ error: "unknown repo" }, 404);
@@ -289,7 +292,7 @@ export async function startServer(options: ServerOptions): Promise<StartedServer
     });
 
     app.delete("/api/comments/:id", async (c) => {
-        const rejected = rejectNonLocalMutation(c);
+        const rejected = rejectNonJsonMutation(c);
         if (rejected) return rejected;
         const repo = registry.resolveRepo(c.req.query("repo"));
         if (!repo) return c.json({ error: "unknown repo" }, 404);
