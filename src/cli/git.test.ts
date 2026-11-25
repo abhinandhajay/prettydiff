@@ -120,6 +120,17 @@ describe("getDiffPayload — working tree", () => {
             }
             expect(await getDiffFile(repo, "missing.txt")).toBeUndefined();
             expect((await getDiffPayloadForFiles(repo, []))!.files).toEqual([]);
+
+            expect(payload!.branch).toBe("main");
+            expect(payload!.branches).toEqual([{ name: "main", current: true }]);
+            const branch = await getDiffPayload(repo, { target: "branch", targetRef: "main" });
+            expect(branch!.files.map((file) => file.path).sort()).toEqual(["a.txt", "staged.txt"]);
+            const committedOnly = await getDiffPayload(repo, {
+                target: "branch",
+                targetRef: "main",
+                includeWorkingTree: false,
+            });
+            expect(committedOnly!.files).toEqual([]);
         },
         TIMEOUT,
     );

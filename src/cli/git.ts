@@ -69,7 +69,13 @@ export async function getBranch(cwd: string): Promise<string> {
         const r = await run("git", ["rev-parse", "--abbrev-ref", "HEAD"], cwd);
         return r.stdout.trim();
     } catch {
-        return "(detached)";
+        // Before the first commit HEAD only resolves as a symbolic ref.
+        try {
+            const r = await run("git", ["symbolic-ref", "--short", "-q", "HEAD"], cwd);
+            return r.stdout.trim() || "(detached)";
+        } catch {
+            return "(detached)";
+        }
     }
 }
 
@@ -418,16 +424,14 @@ async function buildDiffPayload(
             ? await resolveTargetRef(repoRoot, requestedOptions.targetRef, branch)
             : undefined;
     const mergeBase = targetRef ? await resolveMergeBase(repoRoot, targetRef) : null;
+    // An unborn repo has no commits, so diff against the empty tree instead of HEAD.
+    const emptyTree = head
+        ? null
+        : (await run("git", ["hash-object", "-t", "tree", "--stdin"], repoRoot)).stdout.trim();
     const baseRef =
-        target === "branch"
-            ? (mergeBase ?? targetRef ?? "HEAD")
-            : head
-              ? "HEAD"
-              : (
-                    await run("git", ["hash-object", "-t", "tree", "--stdin"], repoRoot)
-                ).stdout.trim();
+        emptyTree ?? (target === "branch" ? (mergeBase ?? targetRef ?? "HEAD") : "HEAD");
     const includeWorkingTree = target !== "branch" || (requestedOptions.includeWorkingTree ?? true);
-    const newRef = includeWorkingTree ? null : "HEAD";
+    const newRef = includeWorkingTree ? null : (emptyTree ?? "HEAD");
     const hasPathFilter = filePaths !== undefined;
     const hasPaths = (filePaths?.length ?? 0) > 0;
     const trackedFilePaths = hasPaths
