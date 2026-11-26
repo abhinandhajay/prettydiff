@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { cleanupDir, makeTmpDir } from "../../test/helpers/tmpRepo";
@@ -198,6 +198,53 @@ describe("skill auto-install", () => {
             const installed = await autoInstallSkill(options);
             expect(installed?.agents).toEqual(["Codex"]);
             expect(await present(path.join(home, ".claude"))).toBe(false);
+        } finally {
+            await cleanupDir(root);
+        }
+    });
+
+    test("viewers starting at once install the skill only once", async () => {
+        const { root, source, home } = await fixture();
+        const dataDir = path.join(root, "data");
+        try {
+            await mkdir(path.join(home, ".claude"), { recursive: true });
+            const options = { home, dataDir, version: "1.0.0", source, env: {} };
+            const results = await Promise.all(
+                Array.from({ length: 4 }, () => autoInstallSkill(options)),
+            );
+            expect(results.filter(Boolean)).toHaveLength(1);
+            expect(
+                await readFile(
+                    path.join(home, ".claude", "skills", "prettydiff-cli", "SKILL.md"),
+                    "utf8",
+                ),
+            ).toBe("packaged skill\n");
+            expect(await present(path.join(dataDir, "skill-install.lock"))).toBe(false);
+            expect(await autoInstallSkill(options)).toBeNull();
+        } finally {
+            await cleanupDir(root);
+        }
+    });
+
+    test("waits for a live lock and clears a stale one", async () => {
+        const { root, source, home } = await fixture();
+        const dataDir = path.join(root, "data");
+        const lock = path.join(dataDir, "skill-install.lock");
+        try {
+            await mkdir(path.join(home, ".claude"), { recursive: true });
+            await mkdir(dataDir, { recursive: true });
+            const options = { home, dataDir, version: "1.0.0", source, env: {} };
+
+            // Another viewer is installing: leave it to that one.
+            await writeFile(lock, "123");
+            expect(await autoInstallSkill(options)).toBeNull();
+            expect(await present(path.join(home, ".claude", "skills"))).toBe(false);
+
+            // A lock left by a viewer that died long ago does not block the install forever.
+            const old = new Date(Date.now() - 10 * 60_000);
+            await utimes(lock, old, old);
+            expect((await autoInstallSkill(options))?.agents).toEqual(["Claude Code"]);
+            expect(await present(lock)).toBe(false);
         } finally {
             await cleanupDir(root);
         }

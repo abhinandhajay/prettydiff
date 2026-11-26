@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -185,6 +185,43 @@ export async function detectSkillAgents(home: string): Promise<Exclude<SkillAgen
     return agents;
 }
 
+/** A lock older than this is left over from a process that died mid-install. */
+const SKILL_INSTALL_LOCK_STALE_MS = 60_000;
+
+async function installedVersionMatches(marker: string, version: string): Promise<boolean> {
+    try {
+        const recorded = JSON.parse(await readFile(marker, "utf8")) as { version?: unknown };
+        return recorded.version === version;
+    } catch {
+        // No marker yet, or unreadable: install.
+        return false;
+    }
+}
+
+/**
+ * Takes a cross-process lock so two viewers starting at once don't replace the same skill directory
+ * together. Returns a release function, or null when another process holds the lock.
+ */
+async function acquireInstallLock(lockPath: string): Promise<(() => Promise<void>) | null> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const handle = await open(lockPath, "wx");
+            await handle.writeFile(String(process.pid));
+            await handle.close();
+            return () => rm(lockPath, { force: true });
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+            const age = await stat(lockPath).then(
+                (info) => Date.now() - info.mtimeMs,
+                () => Infinity,
+            );
+            if (age < SKILL_INSTALL_LOCK_STALE_MS) return null;
+            await rm(lockPath, { force: true });
+        }
+    }
+    return null;
+}
+
 /**
  * Installs the packaged skill for detected agents the first time a prettydiff version runs, and
  * again after an upgrade. Returns what it installed, or null when nothing needed installing.
@@ -195,24 +232,28 @@ export async function autoInstallSkill(
     const env = options.env ?? process.env;
     if (isEnvTrue(env.PRETTYDIFF_NO_SKILL_INSTALL)) return null;
     const marker = path.join(options.dataDir, "skill-install.json");
-    try {
-        const recorded = JSON.parse(await readFile(marker, "utf8")) as { version?: unknown };
-        if (recorded.version === options.version) return null;
-    } catch {
-        // No marker yet, or unreadable: install below.
-    }
+    if (await installedVersionMatches(marker, options.version)) return null;
     const agents = await detectSkillAgents(options.home);
     if (!agents.length) return null;
-    const destinations = agents.flatMap((agent) => skillDestinations(options.home, agent));
-    for (const destination of destinations) {
-        await installSkill(options.source ?? bundledSkillPath(), destination);
-    }
     await mkdir(options.dataDir, { recursive: true });
-    await writeFile(
-        marker,
-        JSON.stringify({ version: options.version, agents, destinations }, null, 2) + "\n",
-    );
-    return { agents: agents.map((agent) => AGENT_LABELS[agent]), destinations };
+    const release = await acquireInstallLock(path.join(options.dataDir, "skill-install.lock"));
+    // Another viewer is installing right now; it writes the marker when it finishes.
+    if (!release) return null;
+    try {
+        // Check again under the lock: a viewer that just finished may have installed this version.
+        if (await installedVersionMatches(marker, options.version)) return null;
+        const destinations = agents.flatMap((agent) => skillDestinations(options.home, agent));
+        for (const destination of destinations) {
+            await installSkill(options.source ?? bundledSkillPath(), destination);
+        }
+        await writeFile(
+            marker,
+            JSON.stringify({ version: options.version, agents, destinations }, null, 2) + "\n",
+        );
+        return { agents: agents.map((agent) => AGENT_LABELS[agent]), destinations };
+    } finally {
+        await release();
+    }
 }
 
 export function formatAutoInstallNotice(result: AutoInstallResult): string {
