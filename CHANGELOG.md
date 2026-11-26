@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-11-26
+
+### Added
+
+- The CLI suggests running `prettydiff skill install` when the agent skill is missing ([#31](https://github.com/abhinandhajay/prettydiff/pull/31)).
+
+### Fixed
+
+- Repositories with no commits yet, including orphan branches, now show their changes and support branch mode ([#25](https://github.com/abhinandhajay/prettydiff/pull/25), [#29](https://github.com/abhinandhajay/prettydiff/pull/29)).
+- Filenames that look like options or `HEAD`, untracked symlinks, quoted or non-ASCII paths, and multi-byte UTF-8 content now diff correctly ([#23](https://github.com/abhinandhajay/prettydiff/pull/23), [#24](https://github.com/abhinandhajay/prettydiff/pull/24), [#27](https://github.com/abhinandhajay/prettydiff/pull/27)).
+- `prettydiff comments` accepts option values that start with a dash ([#30](https://github.com/abhinandhajay/prettydiff/pull/30)).
+- Every comment on a line now renders, and comments stay reachable when the diff is empty ([#19](https://github.com/abhinandhajay/prettydiff/pull/19), [#20](https://github.com/abhinandhajay/prettydiff/pull/20)).
+- The viewer recovers from a failed diff load, and the reconnect badge clears after the shared server changes hands ([#18](https://github.com/abhinandhajay/prettydiff/pull/18), [#21](https://github.com/abhinandhajay/prettydiff/pull/21)).
+- Sidebar navigation reaches the right file when paths differ only by punctuation ([#22](https://github.com/abhinandhajay/prettydiff/pull/22)).
+- The diff and file tree stay dark when the OS is in light mode ([#32](https://github.com/abhinandhajay/prettydiff/pull/32)).
+- The local server only answers requests addressed to `localhost` ([#26](https://github.com/abhinandhajay/prettydiff/pull/26)).
+
 ## [0.8.0] - 2026-09-10
 
 ### Added
@@ -107,6 +124,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 - Detects modified, added, deleted, renamed, and untracked files.
 - Flags: `--port <n>`, `--no-open`, `--version` / `-v`, `--help` / `-h`.
 
+[0.8.1]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.8.1
 [0.8.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.8.0
 [0.7.1]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.7.1
 [0.7.0]: https://github.com/abhinandhajay/prettydiff/releases/tag/v0.7.0
