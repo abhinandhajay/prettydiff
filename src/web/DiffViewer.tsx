@@ -793,85 +793,85 @@ export function DiffViewer({
                 onIncludeWorkingTreeChange={setIncludeWorkingTree}
             />
             <div className="relative flex min-h-0 flex-1 overflow-hidden">
-                {payload.files.length === 0 ? (
-                    <EmptyState
-                        kind="empty"
-                        title="No changes"
-                        message="Selected diff has no changes."
-                    />
-                ) : (
-                    <ResizablePanelGroup
-                        direction="horizontal"
-                        className={cn(
-                            "relative min-h-0 flex-1 overflow-hidden",
-                            animatePanel && "resizable-panel-animated",
-                        )}
+                <ResizablePanelGroup
+                    direction="horizontal"
+                    className={cn(
+                        "relative min-h-0 flex-1 overflow-hidden",
+                        animatePanel && "resizable-panel-animated",
+                    )}
+                >
+                    <ResizablePanel
+                        id="review-sidebar"
+                        panelRef={leftPanelRef}
+                        collapsible
+                        collapsedSize={`${COLLAPSED_LEFT_PANEL_WIDTH}px`}
+                        defaultSize={panelDefaultSizeRef.current}
+                        minSize={`${MIN_LEFT_PANEL_WIDTH}px`}
+                        maxSize={`${MAX_LEFT_PANEL_WIDTH}px`}
+                        groupResizeBehavior="preserve-pixel-size"
+                        onResize={(size) => {
+                            if (animatingRef.current) return;
+                            if (closedPanelDragActiveRef.current) return;
+                            const pixelSize = Math.round(size.inPixels);
+                            // Keep leftPanelOpen in sync with the live width in BOTH
+                            // directions. A single drag can collapse the panel and then
+                            // re-expand it; syncing only on collapse would leave the
+                            // library panel wide while React still renders the 52px rail.
+                            const nextOpen = pixelSize > LEFT_PANEL_COLLAPSE_TRIGGER_WIDTH;
+                            if (nextOpen !== leftPanelOpen) setLeftPanelOpen(nextOpen);
+                            if (nextOpen) {
+                                setLeftPanelSize(clampLeftPanelWidth(pixelSize));
+                            }
+                        }}
+                        className="min-w-0 overflow-hidden"
                     >
-                        <ResizablePanel
-                            id="review-sidebar"
-                            panelRef={leftPanelRef}
-                            collapsible
-                            collapsedSize={`${COLLAPSED_LEFT_PANEL_WIDTH}px`}
-                            defaultSize={panelDefaultSizeRef.current}
-                            minSize={`${MIN_LEFT_PANEL_WIDTH}px`}
-                            maxSize={`${MAX_LEFT_PANEL_WIDTH}px`}
-                            groupResizeBehavior="preserve-pixel-size"
-                            onResize={(size) => {
-                                if (animatingRef.current) return;
-                                if (closedPanelDragActiveRef.current) return;
-                                const pixelSize = Math.round(size.inPixels);
-                                // Keep leftPanelOpen in sync with the live width in BOTH
-                                // directions. A single drag can collapse the panel and then
-                                // re-expand it; syncing only on collapse would leave the
-                                // library panel wide while React still renders the 52px rail.
-                                const nextOpen = pixelSize > LEFT_PANEL_COLLAPSE_TRIGGER_WIDTH;
-                                if (nextOpen !== leftPanelOpen) setLeftPanelOpen(nextOpen);
-                                if (nextOpen) {
-                                    setLeftPanelSize(clampLeftPanelWidth(pixelSize));
-                                }
-                            }}
-                            className="min-w-0 overflow-hidden"
-                        >
-                            {leftPanelOpen ? (
-                                <ReviewSidebar
-                                    open={leftPanelOpen}
-                                    activeTab={leftPanelTab}
-                                    onOpenChange={setReviewPanelOpen}
-                                    onTabChange={setLeftPanelTab}
-                                    files={sortedFiles}
-                                    activePath={activePath}
-                                    onScrollToFile={scrollToFile}
-                                    comments={comments}
-                                    totalCommentCount={totalCommentCount}
-                                    selectedCommentIds={selectedCommentIds}
-                                    onToggleSelectedComment={toggleSelected}
-                                    onToggleFileComments={toggleFileSelection}
-                                    onEditComment={editComment}
-                                    onDeleteComment={deleteComment}
-                                    onCopyComments={copySelected}
-                                    scrollToCommentId={scrollToCommentId}
-                                    onCommentScrollHandled={clearScrollTarget}
-                                    onJumpToDiffComment={jumpToDiffComment}
-                                />
-                            ) : (
-                                <CollapsedReviewRail
-                                    files={sortedFiles}
-                                    totalCommentCount={totalCommentCount}
-                                    onOpen={() => setReviewPanelOpen(true)}
-                                    onResizeStart={startClosedPanelResize}
-                                />
-                            )}
-                        </ResizablePanel>
-                        <ResizableHandle
-                            disabled={!leftPanelOpen}
-                            withHandle={leftPanelOpen}
-                            className="transition-colors"
-                        />
-                        <ResizablePanel id="diff-content" minSize="0px">
-                            {diffContent}
-                        </ResizablePanel>
-                    </ResizablePanelGroup>
-                )}
+                        {leftPanelOpen ? (
+                            <ReviewSidebar
+                                open={leftPanelOpen}
+                                activeTab={leftPanelTab}
+                                onOpenChange={setReviewPanelOpen}
+                                onTabChange={setLeftPanelTab}
+                                files={sortedFiles}
+                                activePath={activePath}
+                                onScrollToFile={scrollToFile}
+                                comments={comments}
+                                totalCommentCount={totalCommentCount}
+                                selectedCommentIds={selectedCommentIds}
+                                onToggleSelectedComment={toggleSelected}
+                                onToggleFileComments={toggleFileSelection}
+                                onEditComment={editComment}
+                                onDeleteComment={deleteComment}
+                                onCopyComments={copySelected}
+                                scrollToCommentId={scrollToCommentId}
+                                onCommentScrollHandled={clearScrollTarget}
+                                onJumpToDiffComment={jumpToDiffComment}
+                            />
+                        ) : (
+                            <CollapsedReviewRail
+                                files={sortedFiles}
+                                totalCommentCount={totalCommentCount}
+                                onOpen={() => setReviewPanelOpen(true)}
+                                onResizeStart={startClosedPanelResize}
+                            />
+                        )}
+                    </ResizablePanel>
+                    <ResizableHandle
+                        disabled={!leftPanelOpen}
+                        withHandle={leftPanelOpen}
+                        className="transition-colors"
+                    />
+                    <ResizablePanel id="diff-content" minSize="0px" className="flex flex-col">
+                        {payload.files.length === 0 ? (
+                            <EmptyState
+                                kind="empty"
+                                title="No changes"
+                                message="Selected diff has no changes."
+                            />
+                        ) : (
+                            diffContent
+                        )}
+                    </ResizablePanel>
+                </ResizablePanelGroup>
                 {overlay}
                 {commentError ? (
                     <div className="bg-destructive text-destructive-foreground absolute right-4 bottom-4 z-50 max-w-md rounded-md px-3 py-2 text-xs shadow-lg">
