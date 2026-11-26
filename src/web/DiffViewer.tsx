@@ -7,6 +7,7 @@ import {
     ReviewSidebar,
     type ReviewSidebarTab,
 } from "@/components/ReviewSidebar";
+import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import {
     allCommentIds,
@@ -348,6 +349,7 @@ export function DiffViewer({
             const requestTarget = target === "branch" && !targetRef ? "working-tree" : target;
             if (mode === "reload") setIsReloading(true);
             if (mode === "initial") {
+                setError(null);
                 setIsReloading(false);
                 setInitialLoadPending(true);
                 setMountReady(false);
@@ -376,6 +378,7 @@ export function DiffViewer({
                         }
                     }
                     if (loadId !== loadIdRef.current) return;
+                    setError(null);
                     setPayload(p);
                     refreshComments().catch(() => {});
                     setFileRenderMeta(renderMeta);
@@ -427,8 +430,19 @@ export function DiffViewer({
     );
 
     useEffect(() => {
+        const loadSequence = loadIdRef;
         loadDiff("initial");
+        return () => {
+            loadSequence.current++;
+        };
     }, [loadDiff]);
+
+    const wasReconnectingRef = useRef(reconnecting);
+    useEffect(() => {
+        const recovered = wasReconnectingRef.current && !reconnecting;
+        wasReconnectingRef.current = reconnecting;
+        if (recovered) loadDiff(error || !payload ? "initial" : "reload");
+    }, [reconnecting, loadDiff, error, payload]);
 
     const reload = useCallback(() => {
         refreshRepos();
@@ -699,7 +713,17 @@ export function DiffViewer({
     if (error) {
         return (
             <div className="bg-background flex min-h-screen flex-col">
-                <EmptyState kind="error" title="Couldn't load diff" message={error} />
+                <EmptyState kind="error" title="Couldn't load diff" message={error}>
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            refreshRepos();
+                            loadDiff("initial");
+                        }}
+                    >
+                        Retry
+                    </Button>
+                </EmptyState>
             </div>
         );
     }
