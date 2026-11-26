@@ -46,8 +46,8 @@
     },
     "dependencies": {
         "@hono/node-server": "^2.0.6",
-        "@pierre/diffs": "^1.2.12",
-        "@pierre/trees": "^1.0.0-beta.5",
+        "@pierre/diffs": "^1.7.2",
+        "@pierre/trees": "^1.0.0",
         "@radix-ui/react-select": "^2.3.2",
         "get-port": "^7.2.0",
         "hono": "^4.12.27",

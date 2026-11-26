@@ -256,6 +256,7 @@ function FileCardImpl({
     const diffOptions = useMemo(
         () => ({
             diffStyle: viewMode,
+            themeType: "dark" as const,
             disableFileHeader: true,
             overflow: (wrap ? "wrap" : "scroll") as "wrap" | "scroll",
             enableGutterUtility: true,
