@@ -74,7 +74,9 @@ Comments are stored outside the repository in the operating system's application
 
 ## Agent skill
 
-The package includes a concise skill that teaches Codex and Claude how to operate the shared comment CLI:
+The package includes a concise skill that teaches Codex and Claude how to operate the shared comment CLI. The first time a prettydiff version starts the viewer, it installs the skill for each agent it finds set up (`~/.claude` for Claude Code, `~/.codex` or `~/.agents` for Codex) and prints a one-line notice. Upgrades refresh the installed copies the same way. Set `PRETTYDIFF_NO_SKILL_INSTALL=1` to turn this off.
+
+To install it yourself, for example after setting up a new agent:
 
 ```sh
 prettydiff skill install

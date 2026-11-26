@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { cleanupDir, makeTmpDir } from "../../test/helpers/tmpRepo";
 
 import {
+    autoInstallSkill,
+    detectSkillAgents,
+    formatAutoInstallNotice,
     installSkill,
     runSkillCommand,
     SKILL_HELP,
@@ -119,6 +122,102 @@ describe("skill install", () => {
                 }),
             ).toBe(0);
             expect(stdout).toBe(expected);
+        }
+    });
+});
+
+describe("skill auto-install", () => {
+    async function present(target: string): Promise<boolean> {
+        try {
+            await access(target);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    test("installs for detected agents once per version", async () => {
+        const { root, source, home } = await fixture();
+        const dataDir = path.join(root, "data");
+        try {
+            await mkdir(path.join(home, ".claude"), { recursive: true });
+            await mkdir(path.join(home, ".codex"), { recursive: true });
+            const options = { home, dataDir, version: "1.0.0", source, env: {} };
+
+            const first = await autoInstallSkill(options);
+            expect(first).toEqual({
+                agents: ["Claude Code", "Codex"],
+                destinations: [
+                    path.join(home, ".claude", "skills", "prettydiff-cli"),
+                    path.join(home, ".agents", "skills", "prettydiff-cli"),
+                ],
+            });
+            for (const destination of first!.destinations) {
+                expect(await readFile(path.join(destination, "SKILL.md"), "utf8")).toBe(
+                    "packaged skill\n",
+                );
+            }
+            expect(formatAutoInstallNotice(first!)).toContain("for Claude Code and Codex");
+
+            // The same version does not reinstall, even if the user removed a copy.
+            await writeFile(path.join(source, "SKILL.md"), "updated skill\n");
+            expect(await autoInstallSkill(options)).toBeNull();
+            expect(
+                await readFile(
+                    path.join(home, ".claude", "skills", "prettydiff-cli", "SKILL.md"),
+                    "utf8",
+                ),
+            ).toBe("packaged skill\n");
+
+            // An upgrade refreshes the installed copies.
+            expect(await autoInstallSkill({ ...options, version: "1.1.0" })).not.toBeNull();
+            expect(
+                await readFile(
+                    path.join(home, ".claude", "skills", "prettydiff-cli", "SKILL.md"),
+                    "utf8",
+                ),
+            ).toBe("updated skill\n");
+        } finally {
+            await cleanupDir(root);
+        }
+    });
+
+    test("only installs for agents that are set up", async () => {
+        const { root, source, home } = await fixture();
+        const dataDir = path.join(root, "data");
+        try {
+            await mkdir(home, { recursive: true });
+            expect(await detectSkillAgents(home)).toEqual([]);
+            const options = { home, dataDir, version: "1.0.0", source, env: {} };
+            expect(await autoInstallSkill(options)).toBeNull();
+            expect(await present(path.join(home, ".claude"))).toBe(false);
+            expect(await present(path.join(dataDir, "skill-install.json"))).toBe(false);
+
+            await mkdir(path.join(home, ".agents"), { recursive: true });
+            expect(await detectSkillAgents(home)).toEqual(["codex"]);
+            const installed = await autoInstallSkill(options);
+            expect(installed?.agents).toEqual(["Codex"]);
+            expect(await present(path.join(home, ".claude"))).toBe(false);
+        } finally {
+            await cleanupDir(root);
+        }
+    });
+
+    test("can be turned off", async () => {
+        const { root, source, home } = await fixture();
+        try {
+            await mkdir(path.join(home, ".claude"), { recursive: true });
+            const result = await autoInstallSkill({
+                home,
+                dataDir: path.join(root, "data"),
+                version: "1.0.0",
+                source,
+                env: { PRETTYDIFF_NO_SKILL_INSTALL: "1" },
+            });
+            expect(result).toBeNull();
+            expect(await present(path.join(home, ".claude", "skills"))).toBe(false);
+        } finally {
+            await cleanupDir(root);
         }
     });
 });

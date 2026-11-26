@@ -9,7 +9,7 @@ interface StoredReview extends CommentSnapshot {
     repoRoot: string;
 }
 
-function defaultDataDir(): string {
+export function defaultDataDir(): string {
     if (process.env.PRETTYDIFF_DATA_DIR) return process.env.PRETTYDIFF_DATA_DIR;
     if (process.platform === "darwin") {
         return path.join(os.homedir(), "Library", "Application Support", "prettydiff");
