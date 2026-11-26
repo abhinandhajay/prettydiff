@@ -116,23 +116,26 @@ function flagName(arg: string): string | null {
 }
 
 const STRING_FLAGS = ["target", "target-ref", "file", "side", "line", "body", "author", "id"];
+const KNOWN_FLAGS = new Set([...STRING_FLAGS, "help", "include-working-tree"]);
 const SHORT_FLAGS = new Set(["-h"]);
 
-// mri reads a value such as "-rf.txt" after "--file" as short flags, so join a
-// dash-prefixed value onto its option. A value starting with "--" is still
-// treated as the next option, so a missing value is reported as missing.
+// mri reads a value such as "-rf.txt" after "--file" as short flags, and a value
+// such as "--draft" as another option, so join a dash-prefixed value onto its
+// option. A value naming a known option is left alone so a missing value is
+// still reported as missing.
 function joinDashValues(argv: string[]): string[] {
     const joined: string[] = [];
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         const next = argv[i + 1];
+        const nextFlag = next === undefined ? null : flagName(next);
         if (
             arg.startsWith("--") &&
             !arg.includes("=") &&
             STRING_FLAGS.includes(arg.slice(2)) &&
             next !== undefined &&
             next.startsWith("-") &&
-            !next.startsWith("--") &&
+            !(nextFlag !== null && KNOWN_FLAGS.has(nextFlag)) &&
             !SHORT_FLAGS.has(next)
         ) {
             joined.push(`${arg}=${next}`);

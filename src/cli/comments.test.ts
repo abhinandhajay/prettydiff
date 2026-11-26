@@ -188,8 +188,31 @@ describe("comments commands", () => {
             expect(body.comment).toEqual(
                 expect.objectContaining({ filePath: "-rf.txt", body: "-1 for this name" }),
             );
+
+            await writeRepoFile(repo, "--", "double dash\n");
+            const doubleDash = await runOwn([
+                "add",
+                "--file",
+                "--",
+                "--side",
+                "additions",
+                "--line",
+                "1",
+                "--body",
+                "--force is not needed here",
+            ]);
+            expect(doubleDash.stderr).toBe("");
+            expect(doubleDash.code).toBe(0);
+            expect(JSON.parse(doubleDash.stdout).comment).toEqual(
+                expect.objectContaining({ filePath: "--", body: "--force is not needed here" }),
+            );
+
+            const missingValue = await runOwn(["add", "--file", "--side", "additions"]);
+            expect(missingValue.code).toBe(2);
+            expect(missingValue.stderr).toContain("--file is required");
         } finally {
             await rm(path.join(repo, "-rf.txt"));
+            await rm(path.join(repo, "--"));
         }
     });
 

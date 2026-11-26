@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rm } from "node:fs/promises";
+import { createServer, type RequestListener } from "node:http";
 
 import { discoverHub, probeHub, startInstance, type HubTimings } from "./hubClient.js";
 import { HubRegistry, repoIdFor } from "./registry.js";
@@ -8,6 +9,7 @@ import { makeGitRepo } from "./testUtils.js";
 
 import type { InstanceController } from "./hubClient.js";
 import type { HubReposResponse } from "./types.js";
+import type { AddressInfo } from "node:net";
 
 const TEST_TIMINGS: Partial<HubTimings> = {
     probeTimeoutMs: 250,
@@ -19,6 +21,21 @@ const TEST_TIMINGS: Partial<HubTimings> = {
     rejoinProbeAttempts: 10,
     rejoinProbeDelayMs: 50,
 };
+
+// Bun.serve can't be used here: importing @hono/node-server replaces the global
+// Response, which Bun.serve then rejects.
+async function startDecoy(handler: RequestListener) {
+    const server = createServer(handler);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    return {
+        port,
+        close: () => {
+            server.closeAllConnections();
+            return new Promise<void>((resolve) => server.close(() => resolve()));
+        },
+    };
+}
 
 function makeHub(repoRoot: string, port = 0, hubId: string = crypto.randomUUID()) {
     const registry = new HubRegistry();
@@ -96,22 +113,24 @@ describe("probe and discovery", () => {
     });
 
     test("probeHub rejects a non-prettydiff server", async () => {
-        const decoy = Bun.serve({
-            port: 0,
-            fetch: () => Response.json({ hello: "world" }),
+        let hits = 0;
+        const decoy = await startDecoy((_req, res) => {
+            hits++;
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(JSON.stringify({ hello: "world" }));
         });
         try {
-            expect(await probeHub(decoy.port ?? 0, 250)).toBeNull();
+            expect(await probeHub(decoy.port, 250)).toBeNull();
+            expect(hits).toBe(1);
         } finally {
-            await decoy.stop(true);
+            await decoy.close();
         }
     });
 
     test("probeHub returns null for a closed port", async () => {
-        const decoy = Bun.serve({ port: 0, fetch: () => new Response("x") });
-        const closedPort = decoy.port ?? 0;
-        await decoy.stop(true);
-        expect(await probeHub(closedPort, 250)).toBeNull();
+        const decoy = await startDecoy((_req, res) => res.end("x"));
+        await decoy.close();
+        expect(await probeHub(decoy.port, 250)).toBeNull();
     });
 
     test("discoverHub honors preferredPort", async () => {
