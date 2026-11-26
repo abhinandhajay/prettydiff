@@ -115,6 +115,35 @@ function flagName(arg: string): string | null {
     return name.startsWith("no-") ? name.slice(3) : name;
 }
 
+const STRING_FLAGS = ["target", "target-ref", "file", "side", "line", "body", "author", "id"];
+const SHORT_FLAGS = new Set(["-h"]);
+
+// mri reads a value such as "-rf.txt" after "--file" as short flags, so join a
+// dash-prefixed value onto its option. A value starting with "--" is still
+// treated as the next option, so a missing value is reported as missing.
+function joinDashValues(argv: string[]): string[] {
+    const joined: string[] = [];
+    for (let i = 0; i < argv.length; i++) {
+        const arg = argv[i];
+        const next = argv[i + 1];
+        if (
+            arg.startsWith("--") &&
+            !arg.includes("=") &&
+            STRING_FLAGS.includes(arg.slice(2)) &&
+            next !== undefined &&
+            next.startsWith("-") &&
+            !next.startsWith("--") &&
+            !SHORT_FLAGS.has(next)
+        ) {
+            joined.push(`${arg}=${next}`);
+            i++;
+        } else {
+            joined.push(arg);
+        }
+    }
+    return joined;
+}
+
 function unknownFlag(argv: string[], allowed: Set<string>): string | undefined {
     return argv.map(flagName).find((name) => name !== null && !allowed.has(name)) ?? undefined;
 }
@@ -182,7 +211,7 @@ export async function runCommentsCommand(argv: string[], io: CommandIo): Promise
     const help = Object.hasOwn(helpByCommand, command) ? helpByCommand[command] : undefined;
     if (!help) return usageError(io, `unknown comments command: ${command}`, "prettydiff comments");
 
-    const commandArgv = argv.slice(1);
+    const commandArgv = joinDashValues(argv.slice(1));
     const allowed = new Set(TARGET_FLAGS);
     if (command === "add") {
         for (const name of ["file", "side", "line", "body", "author"]) allowed.add(name);
@@ -203,7 +232,7 @@ export async function runCommentsCommand(argv: string[], io: CommandIo): Promise
 
     const args = mri(commandArgv, {
         boolean: ["help", "include-working-tree"],
-        string: ["target", "target-ref", "file", "side", "line", "body", "author", "id"],
+        string: STRING_FLAGS,
         default: { "include-working-tree": true },
         alias: { h: "help" },
     });

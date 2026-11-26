@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { rm } from "node:fs/promises";
+import path from "node:path";
 
 import {
     cleanupDir,
@@ -150,6 +152,45 @@ describe("comments commands", () => {
         expect(result.code).toBe(2);
         expect(result.stderr).toContain("--line must be a positive integer");
         expect(await run(["list"])).toEqual(before);
+    });
+
+    test("accepts option values that start with a dash", async () => {
+        await writeRepoFile(repo, "-rf.txt", "dash\n");
+        const dataDir = await makeTmpDir();
+        dirs.push(dataDir);
+        const own = new CommentStore(dataDir);
+        const runOwn = async (argv: string[]) => {
+            let stdout = "";
+            let stderr = "";
+            const code = await runCommentsCommand(argv, {
+                cwd: repo,
+                commentStore: own,
+                stdout: (text) => (stdout += text),
+                stderr: (text) => (stderr += text),
+            });
+            return { code, stdout, stderr };
+        };
+        try {
+            const result = await runOwn([
+                "add",
+                "--file",
+                "-rf.txt",
+                "--side",
+                "additions",
+                "--line",
+                "1",
+                "--body",
+                "-1 for this name",
+            ]);
+            expect(result.stderr).toBe("");
+            expect(result.code).toBe(0);
+            const body = JSON.parse(result.stdout);
+            expect(body.comment).toEqual(
+                expect.objectContaining({ filePath: "-rf.txt", body: "-1 for this name" }),
+            );
+        } finally {
+            await rm(path.join(repo, "-rf.txt"));
+        }
     });
 
     let id: string;
