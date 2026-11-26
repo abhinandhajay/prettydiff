@@ -4,13 +4,12 @@ import mri from "mri";
 import open from "open";
 
 import { runCommentsCommand } from "./comments.js";
-import { defaultDataDir } from "./commentStore.js";
 import { canonicalRepoRoot } from "./git.js";
 import { startInstance } from "./hubClient.js";
 import { findPort } from "./port.js";
 import { HubRegistry } from "./registry.js";
 import { startServer } from "./server.js";
-import { autoInstallSkill, formatAutoInstallNotice, runSkillCommand } from "./skill.js";
+import { runSkillCommand, skillInstallHint } from "./skill.js";
 import { checkForUpdate, detectInstaller, formatUpdateNotice } from "./update.js";
 
 export const HELP = `prettydiff — view Git changes and share review comments
@@ -142,14 +141,12 @@ export async function main(argv: string[], options: MainOptions = {}): Promise<n
         });
     }
 
-    autoInstallSkill({ home: os.homedir(), dataDir: defaultDataDir(), version })
-        .then((result) => {
-            if (result) stdout(formatAutoInstallNotice(result));
+    skillInstallHint(os.homedir())
+        .then((hint) => {
+            if (hint) stdout(hint);
         })
-        .catch((error: Error) => {
-            stderr(
-                `prettydiff: could not install the agent skill: ${error.message}\nRun "prettydiff skill install" to retry.\n`,
-            );
+        .catch(() => {
+            // ignore — the hint is best-effort
         });
 
     checkForUpdate(version)

@@ -1,4 +1,4 @@
-import { cp, mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, rename, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -148,114 +148,26 @@ export async function runSkillCommand(argv: string[], io: SkillIo): Promise<numb
     }
 }
 
-export interface AutoInstallOptions {
-    home: string;
-    dataDir: string;
-    version: string;
-    source?: string;
-    env?: NodeJS.ProcessEnv;
-}
+export const SKILL_INSTALL_HINT = `prettydiff: tip: run "prettydiff skill install" so Claude Code and Codex know how to read and reply to your review comments (set PRETTYDIFF_NO_SKILL_HINT=1 to hide this)\n`;
 
-export interface AutoInstallResult {
-    agents: string[];
-    destinations: string[];
-}
-
-const AGENT_LABELS: Record<Exclude<SkillAgent, "all">, string> = {
-    claude: "Claude Code",
-    codex: "Codex",
-};
-
-async function exists(target: string): Promise<boolean> {
-    try {
-        await stat(target);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-/** Agents whose home directories exist, so prettydiff only installs where an agent is set up. */
-export async function detectSkillAgents(home: string): Promise<Exclude<SkillAgent, "all">[]> {
-    const agents: Exclude<SkillAgent, "all">[] = [];
-    if (await exists(path.join(home, ".claude"))) agents.push("claude");
-    if ((await exists(path.join(home, ".codex"))) || (await exists(path.join(home, ".agents")))) {
-        agents.push("codex");
-    }
-    return agents;
-}
-
-/** A lock older than this is left over from a process that died mid-install. */
-const SKILL_INSTALL_LOCK_STALE_MS = 60_000;
-
-async function installedVersionMatches(marker: string, version: string): Promise<boolean> {
-    try {
-        const recorded = JSON.parse(await readFile(marker, "utf8")) as { version?: unknown };
-        return recorded.version === version;
-    } catch {
-        // No marker yet, or unreadable: install.
-        return false;
-    }
-}
-
-/**
- * Takes a cross-process lock so two viewers starting at once don't replace the same skill directory
- * together. Returns a release function, or null when another process holds the lock.
- */
-async function acquireInstallLock(lockPath: string): Promise<(() => Promise<void>) | null> {
-    for (let attempt = 0; attempt < 2; attempt++) {
+/** Whether the packaged skill is installed for Claude Code or Codex. */
+export async function isSkillInstalled(home: string): Promise<boolean> {
+    for (const destination of skillDestinations(home, "all")) {
         try {
-            const handle = await open(lockPath, "wx");
-            await handle.writeFile(String(process.pid));
-            await handle.close();
-            return () => rm(lockPath, { force: true });
-        } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-            const age = await stat(lockPath).then(
-                (info) => Date.now() - info.mtimeMs,
-                () => Infinity,
-            );
-            if (age < SKILL_INSTALL_LOCK_STALE_MS) return null;
-            await rm(lockPath, { force: true });
+            await stat(path.join(destination, "SKILL.md"));
+            return true;
+        } catch {
+            // Not installed here; check the next agent.
         }
     }
-    return null;
+    return false;
 }
 
-/**
- * Installs the packaged skill for detected agents the first time a prettydiff version runs, and
- * again after an upgrade. Returns what it installed, or null when nothing needed installing.
- */
-export async function autoInstallSkill(
-    options: AutoInstallOptions,
-): Promise<AutoInstallResult | null> {
-    const env = options.env ?? process.env;
-    if (isEnvTrue(env.PRETTYDIFF_NO_SKILL_INSTALL)) return null;
-    const marker = path.join(options.dataDir, "skill-install.json");
-    if (await installedVersionMatches(marker, options.version)) return null;
-    const agents = await detectSkillAgents(options.home);
-    if (!agents.length) return null;
-    await mkdir(options.dataDir, { recursive: true });
-    const release = await acquireInstallLock(path.join(options.dataDir, "skill-install.lock"));
-    // Another viewer is installing right now; it writes the marker when it finishes.
-    if (!release) return null;
-    try {
-        // Check again under the lock: a viewer that just finished may have installed this version.
-        if (await installedVersionMatches(marker, options.version)) return null;
-        const destinations = agents.flatMap((agent) => skillDestinations(options.home, agent));
-        for (const destination of destinations) {
-            await installSkill(options.source ?? bundledSkillPath(), destination);
-        }
-        await writeFile(
-            marker,
-            JSON.stringify({ version: options.version, agents, destinations }, null, 2) + "\n",
-        );
-        return { agents: agents.map((agent) => AGENT_LABELS[agent]), destinations };
-    } finally {
-        await release();
-    }
-}
-
-export function formatAutoInstallNotice(result: AutoInstallResult): string {
-    return `prettydiff: installed the prettydiff-cli agent skill for ${result.agents.join(" and ")} (set PRETTYDIFF_NO_SKILL_INSTALL=1 to skip)\n`;
+/** The tip the viewer prints when the skill isn't installed yet, or null when it is. */
+export async function skillInstallHint(
+    home: string,
+    env: NodeJS.ProcessEnv = process.env,
+): Promise<string | null> {
+    if (isEnvTrue(env.PRETTYDIFF_NO_SKILL_HINT)) return null;
+    return (await isSkillInstalled(home)) ? null : SKILL_INSTALL_HINT;
 }
