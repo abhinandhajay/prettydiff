@@ -250,6 +250,43 @@ describe("getDiffPayload — working tree", () => {
     );
 
     test(
+        "orphan branch keeps the selected branch as the base",
+        async () => {
+            const repo = await trackedRepo();
+            await commitFile(repo, "a.txt", "one\ntwo\n");
+            await runGit(repo, "checkout", "--orphan", "fresh");
+            await writeRepoFile(repo, "a.txt", "one\nchanged\n");
+            await writeRepoFile(repo, "b.txt", "new\n");
+
+            const working = await getDiffPayload(repo);
+            expect(working!.branch).toBe("fresh");
+            expect(fileByPath(working!.files, "a.txt").status).toBe("added");
+
+            const branch = await getDiffPayload(repo, { target: "branch", targetRef: "main" });
+            expect(branch!.targetRef).toBe("main");
+            expect(fileByPath(branch!.files, "a.txt")).toMatchObject({
+                status: "modified",
+                oldContents: "one\ntwo\n",
+                newContents: "one\nchanged\n",
+            });
+            expect(fileByPath(branch!.files, "b.txt").status).toBe("untracked");
+            const single = await getDiffFile(repo, "a.txt", {
+                target: "branch",
+                targetRef: "main",
+            });
+            expect(single).toMatchObject({ status: "modified", oldContents: "one\ntwo\n" });
+
+            const committedOnly = await getDiffPayload(repo, {
+                target: "branch",
+                targetRef: "main",
+                includeWorkingTree: false,
+            });
+            expect(committedOnly!.files).toEqual([]);
+        },
+        TIMEOUT,
+    );
+
+    test(
         "clean repo produces an empty payload with repo metadata",
         async () => {
             const repo = await trackedRepo();

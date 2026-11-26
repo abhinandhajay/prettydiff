@@ -441,6 +441,15 @@ function normalizePath(parsed: parseDiffLib.File): {
     return { path: to ?? from ?? "(unknown)" };
 }
 
+async function isCommit(cwd: string, ref: string): Promise<boolean> {
+    try {
+        await run("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], cwd);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 async function resolveTargetRef(
     cwd: string,
     requestedTargetRef: string | undefined,
@@ -514,9 +523,15 @@ async function buildDiffPayload(
     const emptyTree = head
         ? null
         : (await run("git", ["hash-object", "-t", "tree", "--stdin"], repoRoot)).stdout.trim();
-    const baseRef =
-        emptyTree ?? (target === "branch" ? (mergeBase ?? targetRef ?? "HEAD") : "HEAD");
     const includeWorkingTree = target !== "branch" || (requestedOptions.includeWorkingTree ?? true);
+    // An orphan branch can still compare its working tree against a committed
+    // target branch, but it has no commits of its own to compare.
+    const branchBase =
+        mergeBase ??
+        (emptyTree && (!includeWorkingTree || !(targetRef && (await isCommit(repoRoot, targetRef))))
+            ? emptyTree
+            : (targetRef ?? "HEAD"));
+    const baseRef = target === "branch" ? branchBase : (emptyTree ?? "HEAD");
     const newRef = includeWorkingTree ? null : (emptyTree ?? "HEAD");
     const hasPathFilter = filePaths !== undefined;
     const hasPaths = (filePaths?.length ?? 0) > 0;
