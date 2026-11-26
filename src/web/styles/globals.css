@@ -50,6 +50,7 @@
 }
 
 .dark {
+    color-scheme: dark;
     --background: oklch(0.165 0.004 260);
     --foreground: oklch(0.93 0.003 260);
 

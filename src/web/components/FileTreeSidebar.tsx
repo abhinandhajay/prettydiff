@@ -211,7 +211,7 @@ export function FileTreePanelContent({ files, activePath, onScrollTo }: Props) {
                 </div>
             </div>
             <div className="flex-1 overflow-hidden">
-                <FileTree model={model} className="h-full w-full" />
+                <FileTree model={model} className="h-full w-full" style={{ colorScheme: "dark" }} />
             </div>
             <div className="border-sidebar-border shrink-0 border-t px-3 pt-2.5 pb-3">
                 <div className="mb-2 flex items-center justify-between">
