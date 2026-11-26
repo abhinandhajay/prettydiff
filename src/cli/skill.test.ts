@@ -6,10 +6,13 @@ import { cleanupDir, makeTmpDir } from "../../test/helpers/tmpRepo";
 
 import {
     installSkill,
+    isSkillInstalled,
     runSkillCommand,
     SKILL_HELP,
     SKILL_INSTALL_HELP,
+    SKILL_INSTALL_HINT,
     skillDestinations,
+    skillInstallHint,
 } from "./skill";
 
 async function fixture() {
@@ -119,6 +122,51 @@ describe("skill install", () => {
                 }),
             ).toBe(0);
             expect(stdout).toBe(expected);
+        }
+    });
+});
+
+describe("skill install hint", () => {
+    test("recommends installing until the skill is installed for an agent", async () => {
+        const { root, source, home } = await fixture();
+        try {
+            expect(await isSkillInstalled(home)).toBe(false);
+            expect(await skillInstallHint(home, {})).toBe(SKILL_INSTALL_HINT);
+            expect(SKILL_INSTALL_HINT).toContain("prettydiff skill install");
+
+            // An agent being set up is not enough; the skill itself has to be there.
+            await mkdir(path.join(home, ".claude", "skills"), { recursive: true });
+            expect(await skillInstallHint(home, {})).toBe(SKILL_INSTALL_HINT);
+
+            // Installing for either agent is enough to stop the tip.
+            await installSkill(source, skillDestinations(home, "codex")[0]!);
+            expect(await isSkillInstalled(home)).toBe(true);
+            expect(await skillInstallHint(home, {})).toBeNull();
+        } finally {
+            await cleanupDir(root);
+        }
+    });
+
+    test("the hint does not install anything", async () => {
+        const { root, home } = await fixture();
+        try {
+            await mkdir(path.join(home, ".claude"), { recursive: true });
+            await skillInstallHint(home, {});
+            expect(await isSkillInstalled(home)).toBe(false);
+        } finally {
+            await cleanupDir(root);
+        }
+    });
+
+    test("can be hidden", async () => {
+        const { root, home } = await fixture();
+        try {
+            expect(await skillInstallHint(home, { PRETTYDIFF_NO_SKILL_HINT: "1" })).toBeNull();
+            expect(await skillInstallHint(home, { PRETTYDIFF_NO_SKILL_HINT: "0" })).toBe(
+                SKILL_INSTALL_HINT,
+            );
+        } finally {
+            await cleanupDir(root);
         }
     });
 });

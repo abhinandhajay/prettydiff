@@ -74,7 +74,7 @@ export function isNewer(latest: string, current: string): boolean {
     return false;
 }
 
-function isEnvTrue(value: string | undefined): boolean {
+export function isEnvTrue(value: string | undefined): boolean {
     if (!value) return false;
     const v = value.trim().toLowerCase();
     return v !== "" && v !== "0" && v !== "false" && v !== "no" && v !== "off";

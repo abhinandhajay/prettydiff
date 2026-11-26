@@ -1,9 +1,11 @@
-import { cp, mkdir, rename, rm } from "node:fs/promises";
+import { cp, mkdir, rename, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import mri from "mri";
+
+import { isEnvTrue } from "./update.js";
 
 export const SKILL_HELP = `prettydiff skill — install the packaged agent skill
 
@@ -144,4 +146,28 @@ export async function runSkillCommand(argv: string[], io: SkillIo): Promise<numb
         io.stderr(`prettydiff: could not install skill: ${(error as Error).message}\n`);
         return 1;
     }
+}
+
+export const SKILL_INSTALL_HINT = `prettydiff: tip: run "prettydiff skill install" so Claude Code and Codex know how to read and reply to your review comments (set PRETTYDIFF_NO_SKILL_HINT=1 to hide this)\n`;
+
+/** Whether the packaged skill is installed for Claude Code or Codex. */
+export async function isSkillInstalled(home: string): Promise<boolean> {
+    for (const destination of skillDestinations(home, "all")) {
+        try {
+            await stat(path.join(destination, "SKILL.md"));
+            return true;
+        } catch {
+            // Not installed here; check the next agent.
+        }
+    }
+    return false;
+}
+
+/** The tip the viewer prints when the skill isn't installed yet, or null when it is. */
+export async function skillInstallHint(
+    home: string,
+    env: NodeJS.ProcessEnv = process.env,
+): Promise<string | null> {
+    if (isEnvTrue(env.PRETTYDIFF_NO_SKILL_HINT)) return null;
+    return (await isSkillInstalled(home)) ? null : SKILL_INSTALL_HINT;
 }

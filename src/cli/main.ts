@@ -1,3 +1,5 @@
+import os from "node:os";
+
 import mri from "mri";
 import open from "open";
 
@@ -7,7 +9,7 @@ import { startInstance } from "./hubClient.js";
 import { findPort } from "./port.js";
 import { HubRegistry } from "./registry.js";
 import { startServer } from "./server.js";
-import { runSkillCommand } from "./skill.js";
+import { runSkillCommand, skillInstallHint } from "./skill.js";
 import { checkForUpdate, detectInstaller, formatUpdateNotice } from "./update.js";
 
 export const HELP = `prettydiff — view Git changes and share review comments
@@ -138,6 +140,14 @@ export async function main(argv: string[], options: MainOptions = {}): Promise<n
             // ignore — the URL is printed above
         });
     }
+
+    skillInstallHint(os.homedir())
+        .then((hint) => {
+            if (hint) stdout(hint);
+        })
+        .catch(() => {
+            // ignore — the hint is best-effort
+        });
 
     checkForUpdate(version)
         .then((latest) => {
