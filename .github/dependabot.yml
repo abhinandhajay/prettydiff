@@ -1,0 +1,12 @@
+version: 2
+updates:
+    # Dependabot doesn't support security updates for Bun, so vulnerable
+    # packages only get fixed through these version updates.
+    - package-ecosystem: "bun"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+      groups:
+          dependencies:
+              patterns:
+                  - "*"
